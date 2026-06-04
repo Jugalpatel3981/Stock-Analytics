@@ -1,0 +1,17 @@
+{
+  "name": "ai-stock-intelligence-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build:frontend": "npm --workspace frontend run build",
+    "lint:frontend": "npm --workspace frontend run lint",
+    "dev:backend": "cd backend && uvicorn app.main:app --reload",
+    "test:backend": "cd backend && pytest",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  }
+}

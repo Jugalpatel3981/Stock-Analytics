@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-stock-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stock_intelligence}
+      POSTGRES_USER: ${POSTGRES_USER:-stock_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stock_user} -d ${POSTGRES_DB:-stock_intelligence}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-stock-backend
+    restart: unless-stopped
+    environment:
+      APP_NAME: AI Stock Intelligence Platform API
+      APP_ENV: development
+      API_V1_PREFIX: /api/v1
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-stock_password}@postgres:5432/${POSTGRES_DB:-stock_intelligence}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+    container_name: ai-stock-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
