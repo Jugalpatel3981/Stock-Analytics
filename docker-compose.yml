@@ -29,6 +29,11 @@ services:
       API_V1_PREFIX: /api/v1
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-stock_password}@postgres:5432/${POSTGRES_DB:-stock_intelligence}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-replace-with-a-long-random-secret}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-access_token}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -45,6 +50,7 @@ services:
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+      API_INTERNAL_BASE_URL: http://backend:8000/api/v1
     ports:
       - "3000:3000"
     depends_on:

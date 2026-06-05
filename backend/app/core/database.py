@@ -1,6 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
+from app.models.base import Base
+
+# Import model modules so SQLAlchemy metadata knows about tables during create_all.
+from app.models import user  # noqa: F401
 
 settings = get_settings()
 
@@ -16,3 +20,8 @@ async_session_factory = async_sessionmaker(
     autoflush=False,
     expire_on_commit=False,
 )
+
+
+async def create_database_tables() -> None:
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)

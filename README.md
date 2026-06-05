@@ -134,6 +134,33 @@ curl http://localhost:8000/health
 curl http://localhost:8000/api/v1/health
 ```
 
+## Authentication
+
+Phase 2 adds JWT authentication stored in an HttpOnly cookie. Browser JavaScript does not store the token directly.
+
+Auth endpoints:
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/auth/protected`
+
+For Docker development, `AUTO_CREATE_TABLES=true` creates the `users` table when the backend starts. For local development without Docker, start PostgreSQL, confirm `DATABASE_URL`, then run:
+
+```bash
+cd backend
+python -m app.scripts.init_db
+```
+
+Frontend auth routes:
+
+- `/login`
+- `/register`
+- `/dashboard`
+
+In Docker, the frontend uses `API_INTERNAL_BASE_URL=http://backend:8000/api/v1` for server-side requests between containers. Browser requests continue to use `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1`.
+
 ## Phase 1 Scope
 
 This phase establishes the production-ready monorepo foundation:

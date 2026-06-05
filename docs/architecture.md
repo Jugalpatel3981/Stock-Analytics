@@ -22,6 +22,17 @@ The backend uses a layered structure:
 
 This keeps route handlers thin and leaves room for testing domain logic independently.
 
+## Authentication
+
+Authentication is implemented in the backend under `/api/v1/auth`. JWT access tokens are issued after register/login and stored in an HttpOnly cookie. The frontend never stores tokens in `localStorage`.
+
+Reusable auth concerns are split by responsibility:
+
+- `core/security.py`: password hashing and JWT encode/decode.
+- `api/deps.py`: current-user dependency for protected routes.
+- `services/user_service.py`: user lookup, creation, and password verification.
+- `models/user.py`: SQLAlchemy `users` table model.
+
 ## Frontend Boundaries
 
 The frontend uses:

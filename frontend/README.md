@@ -14,3 +14,9 @@ npm run lint
 ## Environment
 
 Copy `.env.example` to `.env.local` and update values as needed.
+
+## Routes
+
+- `/login`
+- `/register`
+- `/dashboard`

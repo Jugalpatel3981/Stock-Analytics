@@ -15,3 +15,19 @@ pytest
 ## Environment
 
 Copy `.env.example` to `.env` and update values for your local machine.
+
+## Database Initialization
+
+With PostgreSQL running and `DATABASE_URL` configured:
+
+```bash
+python -m app.scripts.init_db
+```
+
+## Auth Endpoints
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/auth/protected`
