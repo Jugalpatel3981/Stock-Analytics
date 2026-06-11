@@ -4,6 +4,7 @@ node_modules/
 venv/
 __pycache__/
 .pytest_cache/
+pytest-cache-files-*/
 .mypy_cache/
 .ruff_cache/
 
@@ -19,6 +20,7 @@ htmlcov/
 .env
 .env.*
 !.env.example
+!.env.production.example
 !frontend/.env.example
 !backend/.env.example
 

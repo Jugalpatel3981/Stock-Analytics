@@ -4,7 +4,7 @@ from app.core.config import get_settings
 from app.models.base import Base
 
 # Import model modules so SQLAlchemy metadata knows about tables during create_all.
-from app.models import user  # noqa: F401
+from app.models import chat, portfolio, user, watchlist  # noqa: F401
 
 settings = get_settings()
 

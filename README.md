@@ -1,92 +1,102 @@
 # AI Stock Intelligence Platform
 
-A production-minded monorepo for a long-term portfolio SaaS project that combines market data, portfolio intelligence, and AI-assisted stock research.
+AI Stock Intelligence Platform is a full-stack portfolio project for stock research, portfolio tracking, market news, AI sentiment analysis, AI-assisted financial research, and experimental price prediction.
+
+It is built as a production-minded monorepo with a Next.js frontend, FastAPI backend, PostgreSQL database, Docker support, CI checks, and deployment preparation for Vercel and Railway.
+
+> This platform provides informational research support only. It does not provide financial advice, buy/sell recommendations, guarantees, or price targets.
+
+## Features
+
+- JWT authentication with HttpOnly cookie sessions
+- Professional dark finance dashboard
+- Stock search and stock detail pages
+- Yahoo Finance company data and historical prices
+- Recharts price visualization
+- Watchlists
+- Portfolio holdings, gain/loss, and growth chart
+- Stock news filtered by ticker
+- HuggingFace-powered news sentiment analysis
+- OpenAI-powered financial assistant with saved chat history
+- XGBoost next-day close prediction module
+- Dockerized frontend, backend, and PostgreSQL
+- GitHub Actions CI
+- Deployment guides for Vercel and Railway
 
 ## Tech Stack
 
-- Frontend: Next.js 15, TypeScript, Tailwind CSS, ShadCN UI conventions
-- Backend: FastAPI, Python, Pydantic Settings, SQLAlchemy async
-- Database: PostgreSQL
-- Infrastructure: Docker and Docker Compose
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 15, TypeScript, Tailwind CSS, ShadCN UI conventions |
+| Backend | FastAPI, Python 3.12, Pydantic Settings |
+| Database | PostgreSQL, SQLAlchemy async |
+| AI | OpenAI Responses API, HuggingFace sentiment model |
+| ML | XGBoost, pandas, numpy, scikit-learn |
+| Charts | Recharts |
+| Infrastructure | Docker, Docker Compose |
+| CI | GitHub Actions |
 
 ## Repository Structure
 
 ```text
 .
-├── backend/                 # FastAPI application
-│   ├── app/
-│   │   ├── api/             # API routers and route dependencies
-│   │   ├── core/            # Settings, database, shared infrastructure
-│   │   ├── models/          # SQLAlchemy model base and future domain models
-│   │   ├── schemas/         # Pydantic request/response schemas
-│   │   └── services/        # Business logic services
-│   └── tests/               # Backend tests
-├── docs/                    # Architecture and phase documentation
-├── frontend/                # Next.js application
-│   └── src/
-│       ├── app/             # App router pages and global styles
-│       ├── components/      # Reusable app and UI components
-│       └── lib/             # Shared utilities and API clients
-└── docker-compose.yml       # Local full-stack orchestration
+|-- backend/                 # FastAPI application
+|   |-- app/
+|   |   |-- api/             # API routers and dependencies
+|   |   |-- core/            # Settings and database infrastructure
+|   |   |-- models/          # SQLAlchemy models
+|   |   |-- schemas/         # Pydantic schemas
+|   |   |-- scripts/         # Utility scripts
+|   |   `-- services/        # Business logic and integrations
+|   `-- tests/               # Backend tests
+|-- docs/                    # Phase docs and deployment guides
+|-- frontend/                # Next.js application
+|   `-- src/
+|       |-- app/             # App Router pages
+|       |-- components/      # Reusable UI and feature components
+|       `-- lib/             # API client and utilities
+|-- docker-compose.yml       # Local development stack
+|-- docker-compose.prod.yml  # Future production Compose template
+`-- .github/workflows/       # CI workflow
 ```
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - Python 3.12+
 - Docker Desktop
-- PostgreSQL client tools, optional for local database inspection
+- Git
 
-## Environment Setup
+## Quick Start With Docker
 
-Copy the example files before running locally:
-
-```bash
-cp .env.example .env
-cp frontend/.env.example frontend/.env.local
-cp backend/.env.example backend/.env
-```
-
-On Windows PowerShell:
+1. Copy environment defaults:
 
 ```powershell
 Copy-Item .env.example .env
-Copy-Item frontend/.env.example frontend/.env.local
-Copy-Item backend/.env.example backend/.env
 ```
 
-## Run With Docker
+2. Start the stack:
 
-```bash
+```powershell
 docker compose up --build
 ```
 
-Services:
+3. Open the app:
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- Backend docs: http://localhost:8000/docs
-- PostgreSQL: localhost:5432
-
-## Run Locally Without Docker
-
-Start PostgreSQL locally or via Docker:
-
-```bash
-docker compose up postgres
+```text
+http://localhost:3000
 ```
+
+Useful URLs:
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+- Backend docs: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/health`
+
+## Local Development Without Docker
 
 Backend:
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Windows PowerShell:
 
 ```powershell
 cd backend
@@ -98,77 +108,126 @@ uvicorn app.main:app --reload
 
 Frontend:
 
-```bash
-cd frontend
+```powershell
 npm install
-npm run dev
-```
-
-You can also use root workspace scripts after installing frontend dependencies:
-
-```bash
 npm run dev:frontend
-npm run dev:backend
 ```
 
-## Validation
+Database initialization:
 
-Backend tests:
-
-```bash
-cd backend
-pytest
-```
-
-Frontend lint:
-
-```bash
-cd frontend
-npm run lint
-```
-
-Docker health check:
-
-```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/api/v1/health
-```
-
-## Authentication
-
-Phase 2 adds JWT authentication stored in an HttpOnly cookie. Browser JavaScript does not store the token directly.
-
-Auth endpoints:
-
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
-- `GET /api/v1/auth/protected`
-
-For Docker development, `AUTO_CREATE_TABLES=true` creates the `users` table when the backend starts. For local development without Docker, start PostgreSQL, confirm `DATABASE_URL`, then run:
-
-```bash
+```powershell
 cd backend
 python -m app.scripts.init_db
 ```
 
-Frontend auth routes:
+## Environment Variables
 
-- `/login`
-- `/register`
-- `/dashboard`
+Copy the examples before local development:
 
-In Docker, the frontend uses `API_INTERNAL_BASE_URL=http://backend:8000/api/v1` for server-side requests between containers. Browser requests continue to use `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1`.
+```powershell
+Copy-Item .env.example .env
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env.local
+```
 
-## Phase 1 Scope
+Detailed environment documentation:
 
-This phase establishes the production-ready monorepo foundation:
+- [Environment Variables](docs/environment-variables.md)
+- Production template: `.env.production.example`
 
-- Next.js frontend scaffold with Tailwind and ShadCN-compatible UI primitives
-- FastAPI backend scaffold with typed environment settings
-- Async PostgreSQL connection wiring
-- Docker Compose for frontend, backend, and database
-- Documentation for architecture, setup, and validation
+Optional AI variables:
 
-Future phases can add authentication, stock data ingestion, portfolio models, AI analysis workflows, background jobs, and deployment automation.
+```text
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+HUGGINGFACE_API_TOKEN=
+HUGGINGFACE_SENTIMENT_MODEL=ProsusAI/finbert
+```
+
+## Testing
+
+Backend:
+
+```powershell
+cd backend
+pytest
+```
+
+Frontend:
+
+```powershell
+npm run lint:frontend
+```
+
+Docker build checks are included in GitHub Actions.
+
+## Main Routes
+
+| Route | Purpose |
+| --- | --- |
+| `/login` | User login |
+| `/register` | User registration |
+| `/dashboard` | Finance dashboard |
+| `/stocks` | Stock search |
+| `/stocks/[ticker]` | Stock detail and price chart |
+| `/watchlists` | Watchlist management |
+| `/portfolio` | Portfolio holdings and growth |
+| `/news` | Stock news and sentiment |
+| `/assistant` | AI financial assistant |
+
+## API Overview
+
+| Area | Endpoint Examples |
+| --- | --- |
+| Auth | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me` |
+| Stocks | `GET /api/v1/stocks/search?query=NVDA`, `GET /api/v1/stocks/NVDA` |
+| History | `GET /api/v1/stocks/NVDA/history?range=1mo` |
+| News | `GET /api/v1/stocks/news?ticker=NVDA` |
+| Prediction | `GET /api/v1/stocks/NVDA/prediction` |
+| Watchlists | `GET /api/v1/watchlists`, `POST /api/v1/watchlists` |
+| Portfolio | `GET /api/v1/portfolio/holdings`, `GET /api/v1/portfolio/growth` |
+| Assistant | `GET /api/v1/chat/sessions`, `POST /api/v1/chat/sessions/{id}/messages` |
+
+## Deployment Preparation
+
+No deployment has been performed yet. The repository is prepared for future deployment.
+
+Guides:
+
+- [Vercel Deployment Guide](docs/deployment-vercel.md)
+- [Railway Deployment Guide](docs/deployment-railway.md)
+
+Deployment-related files:
+
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
+- `docker-compose.yml`
+- `docker-compose.prod.yml`
+- `.env.production.example`
+- `railway.backend.toml`
+- `railway.frontend.toml`
+- `.github/workflows/ci.yml`
+
+## Production Notes
+
+Before deploying for real:
+
+- Set strong secrets.
+- Use HTTPS URLs.
+- Set `AUTH_COOKIE_SECURE=true`.
+- Set `AUTO_CREATE_TABLES=false`.
+- Add the frontend domain to `BACKEND_CORS_ORIGINS`.
+- Configure a managed PostgreSQL database.
+- Run database initialization or migrations once.
+- Verify OpenAI and HuggingFace keys if using AI features.
+
+## Documentation
+
+Phase documentation is available in `docs/`:
+
+- `docs/phase-1.md`
+- `docs/phase-3.md` through `docs/phase-12.md`
+
+## License
+
+Portfolio project. Add a license before public production release if needed.
