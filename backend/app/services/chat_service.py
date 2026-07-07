@@ -1,20 +1,22 @@
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.chat import ChatMessage, ChatSession
+from app.models.chat import ChatMessage, ChatMessageSource, ChatSession
 from app.schemas.chat import (
     ChatExchangeResponse,
     ChatMessageCreate,
     ChatMessageRead,
+    ChatSourceRead,
     ChatSessionCreate,
     ChatSessionDetail,
     ChatSessionRead,
 )
-from app.services import openai_service, stock_service
+from app.services import openai_service, prediction_service, stock_service, tavily_service
 
 COMPANY_TICKERS = {
     "apple": "AAPL",
@@ -28,6 +30,14 @@ COMPANY_TICKERS = {
 }
 
 
+@dataclass(frozen=True)
+class MarketContext:
+    context: str
+    sources: list[ChatSourceRead]
+    symbols: list[str]
+    confidence_score: int
+
+
 def _session_to_read(session: ChatSession) -> ChatSessionRead:
     return ChatSessionRead(
         id=session.id,
@@ -37,12 +47,20 @@ def _session_to_read(session: ChatSession) -> ChatSessionRead:
     )
 
 
-def _message_to_read(message: ChatMessage) -> ChatMessageRead:
+def _message_to_read(
+    message: ChatMessage,
+    sources: list[ChatSourceRead] | None = None,
+) -> ChatMessageRead:
+    source_list = sources or []
+    stock_symbol = source_list[0].stock_symbol if source_list else None
     return ChatMessageRead(
         id=message.id,
         role=message.role,  # type: ignore[arg-type]
         content=message.content,
         created_at=message.created_at,
+        stock_symbol=stock_symbol,
+        confidence_score=85 if message.role == "assistant" and source_list else None,
+        sources=source_list,
     )
 
 
@@ -50,6 +68,11 @@ def _build_title(content: str) -> str:
     title = " ".join(content.strip().split())
     return title[:80] if title else "New AI chat"
 
+
+def _is_prediction_question(content: str) -> bool:
+    lowered_content = content.lower()
+    prediction_terms = ("prediction", "predict", "bullish", "bearish", "model", "expects", "expected", "increase", "decrease")
+    return any(term in lowered_content for term in prediction_terms)
 
 def _extract_tickers(content: str) -> list[str]:
     explicit_tickers = set(re.findall(r"\$([A-Za-z]{1,5})\b", content))
@@ -63,6 +86,25 @@ def _extract_tickers(content: str) -> list[str]:
 
     ignored_terms = {"AI", "API", "CEO", "ETF", "USD", "PE", "IPO", "GDP", "CPI"}
     return sorted(ticker for ticker in tickers if ticker not in ignored_terms)[:3]
+
+
+async def _recent_session_symbols(session: AsyncSession, session_id: int) -> list[str]:
+    result = await session.execute(
+        select(ChatMessageSource.stock_symbol)
+        .join(ChatMessage, ChatMessage.id == ChatMessageSource.message_id)
+        .where(
+            ChatMessage.session_id == session_id,
+            ChatMessageSource.stock_symbol.is_not(None),
+        )
+        .order_by(ChatMessageSource.created_at.desc())
+        .limit(3)
+    )
+    symbols = []
+    for symbol in result.scalars().all():
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+
+    return symbols
 
 
 async def list_sessions(session: AsyncSession, user_id: int) -> list[ChatSessionRead]:
@@ -116,16 +158,70 @@ async def get_session_detail(
         .where(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.created_at.asc())
     )
+    messages = list(result.scalars().all())
+
+    source_result = await session.execute(
+        select(ChatMessageSource).where(
+            ChatMessageSource.message_id.in_([message.id for message in messages] or [0])
+        )
+    )
+    sources_by_message_id: dict[int, list[ChatSourceRead]] = {}
+    for source in source_result.scalars().all():
+        sources_by_message_id.setdefault(source.message_id, []).append(
+            ChatSourceRead(
+                id=source.id,
+                stock_symbol=source.stock_symbol,
+                source_name=source.source_name,
+                title=source.title,
+                published_at=source.published_at,
+                url=source.url,
+            )
+        )
 
     return ChatSessionDetail(
         **_session_to_read(chat_session).model_dump(),
-        messages=[_message_to_read(message) for message in result.scalars().all()],
+        messages=[
+            _message_to_read(message, sources_by_message_id.get(message.id, []))
+            for message in messages
+        ],
     )
 
 
-async def _build_market_context(content: str) -> str:
-    tickers = _extract_tickers(content)
+async def delete_session(
+    session: AsyncSession,
+    user_id: int,
+    session_id: int,
+) -> None:
+    chat_session = await _get_owned_session(session, user_id, session_id)
+    message_ids_result = await session.execute(
+        select(ChatMessage.id).where(ChatMessage.session_id == session_id)
+    )
+    message_ids = list(message_ids_result.scalars().all())
+
+    if message_ids:
+        await session.execute(
+            delete(ChatMessageSource).where(ChatMessageSource.message_id.in_(message_ids))
+        )
+        await session.execute(delete(ChatMessage).where(ChatMessage.session_id == session_id))
+
+    await session.delete(chat_session)
+    await session.commit()
+
+def _source_line(source: ChatSourceRead, detail: str | None = None) -> str:
+    suffix = f" | Detail: {detail}" if detail else ""
+    return (
+        f"- Source: {source.source_name} | Title: {source.title} | "
+        f"Date: {source.published_at or 'Unknown'} | URL: {source.url or 'Unavailable'}{suffix}"
+    )
+
+
+async def _build_market_context(
+    content: str,
+    fallback_symbols: list[str] | None = None,
+) -> MarketContext:
+    tickers = _extract_tickers(content) or (fallback_symbols or [])
     context_sections: list[str] = []
+    sources: list[ChatSourceRead] = []
 
     for ticker in tickers:
         try:
@@ -145,6 +241,10 @@ async def _build_market_context(content: str) -> str:
         except Exception:
             context_sections.append(f"Stock: {ticker}\nCompany data unavailable.")
 
+        if _is_prediction_question(content):
+            prediction_context = await prediction_service.get_prediction_explanation_context(session, ticker)
+            context_sections.append(f"Prediction context for {ticker}:\n{prediction_context}")
+
         try:
             news = await stock_service.get_stock_news(ticker, 5)
             article_lines = [
@@ -156,24 +256,64 @@ async def _build_market_context(content: str) -> str:
                 )
                 for article in news.articles
             ]
+            for article in news.articles:
+                sources.append(
+                    ChatSourceRead(
+                        stock_symbol=ticker,
+                        source_name=article.source or "Yahoo Finance",
+                        title=article.headline,
+                        published_at=article.publish_date,
+                        url=article.url,
+                    )
+                )
             context_sections.append(f"Recent {ticker} news:\n" + "\n".join(article_lines))
         except Exception:
             context_sections.append(f"Recent {ticker} news unavailable.")
 
-    if not context_sections:
-        return "No specific ticker was detected. Answer generally and ask for a ticker if needed."
+        web_results = await tavily_service.search_market_news(
+            f"{ticker} stock latest investor concerns earnings analyst news",
+            max_results=5,
+        )
+        if web_results:
+            web_lines = []
+            for result in web_results:
+                source = ChatSourceRead(
+                    stock_symbol=ticker,
+                    source_name=result.source_name,
+                    title=result.title,
+                    published_at=result.published_at,
+                    url=result.url,
+                )
+                sources.append(source)
+                web_lines.append(_source_line(source, result.content))
+            context_sections.append(f"Web research for {ticker}:\n" + "\n".join(web_lines))
 
-    return "\n\n".join(context_sections)
+    if not context_sections:
+        return MarketContext(
+            context="No specific ticker was detected. Ask the user for the company or ticker before analyzing.",
+            sources=[],
+            symbols=[],
+            confidence_score=30,
+        )
+
+    confidence_score = 85 if sources else 55
+    return MarketContext(
+        context="\n\n".join(context_sections),
+        sources=sources[:12],
+        symbols=tickers,
+        confidence_score=confidence_score,
+    )
 
 
 def _build_instructions() -> str:
     return (
         "You are the AI financial assistant inside AI Stock Intelligence Platform. "
-        "Use the provided stock and news context when answering. Be concise, practical, "
+        "You must answer only from retrieved platform context and cited sources. "
+        "Do not answer from memory. If context is missing, say what is missing. "
+        "Use this exact structure: Summary, Key Factors, Market Sentiment, Risks, "
+        "Recent Developments, Sources, Confidence Score. Be concise, practical, "
         "and transparent about uncertainty. Do not provide personalized financial advice, "
-        "buy/sell instructions, price targets, or guarantees. Always remind the user that "
-        "the response is informational research support and that they should verify data "
-        "before investing."
+        "buy/sell instructions, price targets, or guarantees."
     )
 
 
@@ -183,8 +323,27 @@ def _build_prompt(user_content: str, context: str) -> str:
         f"{user_content}\n\n"
         "Available platform context:\n"
         f"{context}\n\n"
-        "Answer using only this context and clearly state when information is unavailable."
+        "Answer using only this retrieved context. Include source names in the Sources section. "
+        "End with a reminder that this is informational research support, not financial advice."
     )
+
+
+def _persist_message_sources(
+    session: AsyncSession,
+    assistant_message: ChatMessage,
+    market_context: MarketContext,
+) -> None:
+    for source in market_context.sources:
+        session.add(
+            ChatMessageSource(
+                message_id=assistant_message.id,
+                stock_symbol=source.stock_symbol,
+                source_name=source.source_name,
+                title=source.title[:500],
+                published_at=source.published_at,
+                url=source.url,
+            )
+        )
 
 
 async def create_message_exchange(
@@ -203,9 +362,10 @@ async def create_message_exchange(
     session.add(user_message)
     await session.flush()
 
-    context = await _build_market_context(message_create.content)
+    fallback_symbols = await _recent_session_symbols(session, session_id)
+    market_context = await _build_market_context(session, message_create.content, fallback_symbols)
     assistant_content = await openai_service.generate_assistant_response(
-        prompt=_build_prompt(message_create.content, context),
+        prompt=_build_prompt(message_create.content, market_context.context),
         instructions=_build_instructions(),
     )
 
@@ -215,6 +375,8 @@ async def create_message_exchange(
         content=assistant_content,
     )
     session.add(assistant_message)
+    await session.flush()
+    _persist_message_sources(session, assistant_message, market_context)
 
     if chat_session.title == "New AI chat":
         chat_session.title = _build_title(message_create.content)
@@ -228,5 +390,8 @@ async def create_message_exchange(
     return ChatExchangeResponse(
         session=_session_to_read(chat_session),
         user_message=_message_to_read(user_message),
-        assistant_message=_message_to_read(assistant_message),
+        assistant_message=_message_to_read(
+            assistant_message,
+            market_context.sources,
+        ).model_copy(update={"confidence_score": market_context.confidence_score}),
     )

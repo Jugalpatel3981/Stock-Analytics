@@ -71,7 +71,7 @@ def test_read_stock_detail(monkeypatch) -> None:
 
 
 def test_search_stock_by_ticker(monkeypatch) -> None:
-    async def fake_search_stock_by_ticker(query: str) -> list[StockSearchResult]:
+    async def fake_search_stocks(query: str) -> list[StockSearchResult]:
         return [
             StockSearchResult(
                 ticker=query.upper(),
@@ -83,7 +83,7 @@ def test_search_stock_by_ticker(monkeypatch) -> None:
         ]
 
     app.dependency_overrides[get_current_user] = override_current_user
-    monkeypatch.setattr(stock_service, "search_stock_by_ticker", fake_search_stock_by_ticker)
+    monkeypatch.setattr(stock_service, "search_stocks", fake_search_stocks)
 
     response = client.get("/api/v1/stocks/search?query=aapl")
 
@@ -175,25 +175,96 @@ def test_read_stock_news(monkeypatch) -> None:
     assert payload["sentiment_model"] == "ProsusAI/finbert"
 
 
+def test_search_stocks_by_company_name(monkeypatch) -> None:
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "quotes": [
+                    {
+                        "symbol": "NVDA",
+                        "quoteType": "EQUITY",
+                        "longname": "NVIDIA Corporation",
+                        "exchange": "NMS",
+                        "currency": "USD",
+                        "regularMarketPrice": 210.73,
+                    },
+                    {
+                        "symbol": "NVDA",
+                        "quoteType": "EQUITY",
+                        "longname": "NVIDIA Corporation",
+                    },
+                    {
+                        "symbol": "NVDA240621C00100000",
+                        "quoteType": "OPTION",
+                    },
+                ]
+            }
+
+    def fake_get(url: str, params: dict[str, object], timeout: int) -> FakeResponse:
+        assert params["q"] == "nvidia"
+        assert params["quotesCount"] == 8
+        return FakeResponse()
+
+    monkeypatch.setattr("httpx.get", fake_get)
+
+    results = stock_service._search_stocks("nvidia")
+
+    assert len(results) == 1
+    assert results[0].ticker == "NVDA"
+    assert results[0].company_name == "NVIDIA Corporation"
+    assert results[0].current_price == 210.73
+
+
+def test_search_stocks_uses_company_alias_when_yahoo_search_is_empty(monkeypatch) -> None:
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"quotes": []}
+
+    def fake_get(url: str, params: dict[str, object], timeout: int) -> FakeResponse:
+        return FakeResponse()
+
+    def fake_build_stock_detail(ticker: str) -> StockDetail:
+        assert ticker == "NVDA"
+        return StockDetail(
+            ticker="NVDA",
+            company_name="NVIDIA Corporation",
+            exchange="NMS",
+            currency="USD",
+            current_price=210.73,
+        )
+
+    monkeypatch.setattr("httpx.get", fake_get)
+    monkeypatch.setattr(stock_service, "_build_stock_detail", fake_build_stock_detail)
+
+    results = stock_service._search_stocks("nvidia")
+
+    assert len(results) == 1
+    assert results[0].ticker == "NVDA"
+    assert results[0].company_name == "NVIDIA Corporation"
+
+
 def test_read_stock_prediction(monkeypatch) -> None:
-    async def fake_get_stock_prediction(ticker: str) -> StockPredictionResponse:
+    async def fake_get_prediction(session, ticker: str) -> StockPredictionResponse:
+        assert session is not None
         assert ticker == "tsla"
         return StockPredictionResponse(
             ticker=ticker.upper(),
             predicted_close=245.18,
             latest_close=240.52,
+            expected_price_low=238.12,
+            expected_price_high=252.24,
             confidence_score=87.4,
-            historical_accuracy=84.2,
-            training_rows=420,
-            feature_summary=[
-                "Historical close prices",
-                "Trading volume",
-                "5-day moving average",
-            ],
+            prediction_timestamp="2026-06-25T12:00:00+00:00",
         )
 
     app.dependency_overrides[get_current_user] = override_current_user
-    monkeypatch.setattr(prediction_service, "get_stock_prediction", fake_get_stock_prediction)
+    monkeypatch.setattr(prediction_service, "get_prediction", fake_get_prediction)
 
     response = client.get("/api/v1/stocks/tsla/prediction")
 
@@ -203,6 +274,8 @@ def test_read_stock_prediction(monkeypatch) -> None:
     payload = response.json()
     assert payload["ticker"] == "TSLA"
     assert payload["predicted_close"] == 245.18
+    assert payload["expected_price_low"] == 238.12
+    assert payload["expected_price_high"] == 252.24
     assert payload["confidence_score"] == 87.4
-    assert payload["historical_accuracy"] == 84.2
-    assert payload["model_name"] == "XGBoost Regressor"
+    assert payload["data_source"] == "Production ML pipeline"
+

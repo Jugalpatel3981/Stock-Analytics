@@ -8,6 +8,7 @@ import { SentimentTrendChart } from "@/components/news/sentiment-trend-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import { getStockNews, type StockNewsItem, type StockSentimentTrendPoint } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -39,12 +40,11 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
   const [articles, setArticles] = useState<StockNewsItem[]>([]);
   const [sentimentTrend, setSentimentTrend] = useState<StockSentimentTrendPoint[]>([]);
   const [sentimentModel, setSentimentModel] = useState("ProsusAI/finbert");
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 
   const loadNews = useCallback(async (nextTicker: string) => {
     setIsLoading(true);
-    setError(null);
 
     try {
       const news = await getStockNews(nextTicker.trim().toUpperCase());
@@ -55,11 +55,11 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
     } catch (caughtError) {
       setArticles([]);
       setSentimentTrend([]);
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to load stock news");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to load stock news" });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     loadNews(initialTicker);
@@ -88,8 +88,6 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
           {isLoading ? "Loading..." : "Filter"}
         </Button>
       </form>
-
-      {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
 
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -168,3 +166,4 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
     </div>
   );
 }
+

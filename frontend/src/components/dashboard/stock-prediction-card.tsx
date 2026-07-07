@@ -1,13 +1,23 @@
 "use client";
 
-import { BrainCircuit, Search } from "lucide-react";
+import { BrainCircuit, Clock, Hourglass, Search } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import { getStockPrediction, type StockPrediction } from "@/lib/api";
+
+type ReadyStockPrediction = StockPrediction & {
+  status: "ready";
+  predicted_close: number;
+  latest_close: number;
+  expected_price_low: number;
+  expected_price_high: number;
+  confidence_score: number;
+};
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -17,23 +27,51 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function formatTimestamp(value: string | null) {
+  if (!value) {
+    return "Just now";
+  }
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Just now";
+  }
+
+  return parsedDate.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function isReadyPrediction(prediction: StockPrediction): prediction is ReadyStockPrediction {
+  return (
+    prediction.status === "ready" &&
+    prediction.predicted_close !== null &&
+    prediction.latest_close !== null &&
+    prediction.expected_price_low !== null &&
+    prediction.expected_price_high !== null &&
+    prediction.confidence_score !== null
+  );
+}
+
 export function StockPredictionCard() {
   const [ticker, setTicker] = useState("NVDA");
   const [prediction, setPrediction] = useState<StockPrediction | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsLoading(true);
-    setError(null);
 
     try {
       const result = await getStockPrediction(ticker.trim().toUpperCase());
       setPrediction(result);
     } catch (caughtError) {
       setPrediction(null);
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to generate prediction");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to generate prediction" });
     } finally {
       setIsLoading(false);
     }
@@ -54,13 +92,11 @@ export function StockPredictionCard() {
           />
         </div>
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Training..." : "Predict"}
+          {isLoading ? "Loading..." : "Predict"}
         </Button>
       </form>
 
-      {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
-
-      {prediction ? (
+      {prediction && isReadyPrediction(prediction) ? (
         <div className="space-y-4">
           <div className="rounded-md border bg-background/40 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -79,29 +115,49 @@ export function StockPredictionCard() {
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-md border bg-background/40 p-3">
-              <p className="text-xs uppercase text-muted-foreground">Latest Close</p>
+              <p className="text-xs uppercase text-muted-foreground">Latest Daily Close</p>
               <p className="mt-2 text-sm font-semibold">{formatCurrency(prediction.latest_close)}</p>
+            </div>
+            <div className="rounded-md border bg-background/40 p-3">
+              <p className="text-xs uppercase text-muted-foreground">Expected Range</p>
+              <p className="mt-2 text-sm font-semibold">
+                {formatCurrency(prediction.expected_price_low)} - {formatCurrency(prediction.expected_price_high)}
+              </p>
             </div>
             <div className="rounded-md border bg-background/40 p-3">
               <p className="text-xs uppercase text-muted-foreground">Confidence</p>
               <p className="mt-2 text-sm font-semibold">{prediction.confidence_score.toFixed(2)}%</p>
             </div>
-            <div className="rounded-md border bg-background/40 p-3">
-              <p className="text-xs uppercase text-muted-foreground">Accuracy</p>
-              <p className="mt-2 text-sm font-semibold">{prediction.historical_accuracy.toFixed(2)}%</p>
-            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">{prediction.model_name}</Badge>
-            <Badge variant="outline">{prediction.training_rows} rows</Badge>
+            <Badge variant="secondary">Production model</Badge>
+            <Badge variant="outline" className="gap-1">
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+              {formatTimestamp(prediction.prediction_timestamp)}
+            </Badge>
+          </div>
+        </div>
+      ) : prediction?.status === "preparing" ? (
+        <div className="rounded-md border bg-background/40 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+              <Hourglass className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Preparing model for {prediction.ticker}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {prediction.message ?? "The prediction model is being trained in the background. Please check again shortly."}
+              </p>
+            </div>
           </div>
         </div>
       ) : (
         <div className="rounded-md border bg-background/40 p-4 text-sm leading-6 text-muted-foreground">
-          Train an XGBoost model from historical prices, volume, and moving averages to estimate the next trading day close.
+          Uses the latest saved production model trained in the background from historical prices, volume, and technical indicators.
         </div>
       )}
     </div>
   );
 }
+

@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 import yfinance as yf
 from fastapi import HTTPException, status
 
@@ -16,6 +17,26 @@ from app.schemas.stock import (
 )
 from app.core.config import get_settings
 from app.services import sentiment_service
+
+YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
+
+COMPANY_SYMBOL_ALIASES = {
+    "alphabet": "GOOGL",
+    "amazon": "AMZN",
+    "amd": "AMD",
+    "apple": "AAPL",
+    "berkshire hathaway": "BRK-B",
+    "facebook": "META",
+    "google": "GOOGL",
+    "jpmorgan": "JPM",
+    "jpmorgan chase": "JPM",
+    "meta": "META",
+    "meta platforms": "META",
+    "microsoft": "MSFT",
+    "netflix": "NFLX",
+    "nvidia": "NVDA",
+    "tesla": "TSLA",
+}
 
 HISTORY_RANGES = {
     "1d": {"period": "1d", "interval": "5m"},
@@ -122,6 +143,59 @@ def _build_stock_detail(ticker: str) -> StockDetail:
         business_summary=info.get("longBusinessSummary"),
     )
 
+
+def _latest_history_row(stock: yf.Ticker) -> dict[str, Any]:
+    history = stock.history(period="1d", interval="1d", auto_adjust=False)
+    if history.empty:
+        return {}
+
+    latest = history.tail(1).iloc[0]
+    return {
+        "open": latest.get("Open"),
+        "high": latest.get("High"),
+        "low": latest.get("Low"),
+        "volume": latest.get("Volume"),
+    }
+
+
+def _build_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
+    normalized_ticker = normalize_ticker(ticker)
+    stock = yf.Ticker(normalized_ticker)
+    info = stock.info or {}
+    fast_info = stock.fast_info
+    latest_history = _latest_history_row(stock)
+
+    return {
+        "volume": _to_int(
+            info.get("volume")
+            or info.get("regularMarketVolume")
+            or _read_fast_info_value(fast_info, "lastVolume")
+            or latest_history.get("volume")
+        ),
+        "open": _to_float(
+            info.get("open")
+            or info.get("regularMarketOpen")
+            or _read_fast_info_value(fast_info, "open")
+            or latest_history.get("open")
+        ),
+        "high": _to_float(
+            info.get("dayHigh")
+            or info.get("regularMarketDayHigh")
+            or _read_fast_info_value(fast_info, "dayHigh")
+            or latest_history.get("high")
+        ),
+        "low": _to_float(
+            info.get("dayLow")
+            or info.get("regularMarketDayLow")
+            or _read_fast_info_value(fast_info, "dayLow")
+            or latest_history.get("low")
+        ),
+        "previous_close": _to_float(
+            info.get("previousClose")
+            or info.get("regularMarketPreviousClose")
+            or _read_fast_info_value(fast_info, "previousClose")
+        ),
+    }
 
 def _build_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
     normalized_ticker = normalize_ticker(ticker)
@@ -245,6 +319,10 @@ async def get_stock_detail(ticker: str) -> StockDetail:
     return await asyncio.to_thread(_build_stock_detail, ticker)
 
 
+async def get_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
+    return await asyncio.to_thread(_build_stock_market_stats, ticker)
+
+
 async def get_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
     return await asyncio.to_thread(_build_stock_history, ticker, range_key)
 
@@ -273,8 +351,56 @@ async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
     )
 
 
-async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:
-    detail = await get_stock_detail(query)
+def _build_search_result_from_quote(quote: dict[str, Any]) -> StockSearchResult | None:
+    symbol = str(quote.get("symbol") or "").strip().upper()
+    quote_type = str(quote.get("quoteType") or "").upper()
+
+    if not symbol or quote_type not in {"EQUITY", "ETF"}:
+        return None
+
+    return StockSearchResult(
+        ticker=symbol,
+        company_name=quote.get("longname") or quote.get("shortname") or quote.get("name"),
+        exchange=quote.get("exchange") or quote.get("exchDisp"),
+        currency=quote.get("currency"),
+        current_price=_to_float(quote.get("regularMarketPrice")),
+    )
+
+
+def _search_stocks(query: str) -> list[StockSearchResult]:
+    normalized_query = query.strip()
+    if not normalized_query:
+        return []
+
+    try:
+        response = httpx.get(
+            YAHOO_SEARCH_URL,
+            params={"q": normalized_query, "quotesCount": 8, "newsCount": 0},
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        results = []
+        seen_symbols: set[str] = set()
+
+        for quote in payload.get("quotes", []):
+            if not isinstance(quote, dict):
+                continue
+
+            result = _build_search_result_from_quote(quote)
+            if result is None or result.ticker in seen_symbols:
+                continue
+
+            seen_symbols.add(result.ticker)
+            results.append(result)
+
+        if results:
+            return results
+    except Exception:
+        pass
+
+    alias_symbol = COMPANY_SYMBOL_ALIASES.get(normalized_query.lower())
+    detail = _build_stock_detail(alias_symbol or normalized_query)
     return [
         StockSearchResult(
             ticker=detail.ticker,
@@ -284,3 +410,13 @@ async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:
             current_price=detail.current_price,
         )
     ]
+
+
+async def search_stocks(query: str) -> list[StockSearchResult]:
+    return await asyncio.to_thread(_search_stocks, query)
+
+
+async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:
+    return await search_stocks(query)
+
+

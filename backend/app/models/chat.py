@@ -40,3 +40,23 @@ class ChatMessage(Base):
         default=lambda: datetime.now(UTC),
         nullable=False,
     )
+
+
+class ChatMessageSource(Base):
+    __tablename__ = "chat_message_sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
+    message_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_messages.id", ondelete="CASCADE"),
+        index=True,
+    )
+    stock_symbol: Mapped[str | None] = mapped_column(String(12), nullable=True, index=True)
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    published_at: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )

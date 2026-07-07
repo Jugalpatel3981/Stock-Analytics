@@ -41,6 +41,15 @@ async def read_chat_session(
     return await chat_service.get_session_detail(session, current_user.id, session_id)
 
 
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    await chat_service.delete_session(session, current_user.id, session_id)
+
+
 @router.post("/sessions/{session_id}/messages", response_model=ChatExchangeResponse)
 async def create_chat_message(
     session_id: int,

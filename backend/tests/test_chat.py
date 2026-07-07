@@ -97,6 +97,20 @@ def test_read_chat_session(monkeypatch) -> None:
     assert response.json()["messages"][1]["role"] == "assistant"
 
 
+def test_delete_chat_session(monkeypatch) -> None:
+    async def fake_delete_session(session, user_id: int, session_id: int) -> None:
+        assert user_id == 1
+        assert session_id == 1
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    monkeypatch.setattr(chat_service, "delete_session", fake_delete_session)
+
+    response = client.delete("/api/v1/chat/sessions/1")
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+
 def test_create_chat_message(monkeypatch) -> None:
     async def fake_create_message_exchange(
         session,

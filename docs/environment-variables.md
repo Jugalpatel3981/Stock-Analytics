@@ -1,4 +1,4 @@
-# Environment Variables
+﻿# Environment Variables
 
 This document lists the main environment variables needed for local development and future deployment.
 
@@ -33,6 +33,11 @@ HUGGINGFACE_API_TOKEN=
 HUGGINGFACE_SENTIMENT_MODEL=ProsusAI/finbert
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile
+FINNHUB_API_KEY=
+TAVILY_API_KEY=
+TAVILY_SEARCH_DEPTH=basic
 ```
 
 ## Frontend Variables
@@ -40,7 +45,16 @@ OPENAI_MODEL=gpt-4.1-mini
 ```text
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
 API_INTERNAL_BASE_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
 ```
+
+## Integration Notes
+
+`FINNHUB_API_KEY` enables real-time WebSocket market streaming. Without it, live widgets show a clear configuration error instead of fake prices.
+
+`GROQ_API_KEY` enables Groq as the assistant model provider. If both `GROQ_API_KEY` and `OPENAI_API_KEY` are set, the backend prefers Groq.
+
+`TAVILY_API_KEY` enables AI Assistant V2 web research and source citations. Without it, the assistant still uses existing platform stock, news, and sentiment context.
 
 ## Production Notes
 
@@ -56,3 +70,4 @@ API_INTERNAL_BASE_URL=https://your-backend-domain.com/api/v1
 ```
 
 Generate a strong `JWT_SECRET_KEY` before deployment. Never commit real secret values.
+

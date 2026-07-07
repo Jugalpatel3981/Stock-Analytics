@@ -81,24 +81,61 @@ export type StockNewsResponse = {
 
 export type StockPrediction = {
   ticker: string;
-  predicted_close: number;
-  latest_close: number;
-  confidence_score: number;
-  historical_accuracy: number;
-  training_rows: number;
-  feature_summary: string[];
-  model_name: string;
+  status: "ready" | "preparing";
+  predicted_close: number | null;
+  latest_close: number | null;
+  expected_price_low: number | null;
+  expected_price_high: number | null;
+  confidence_score: number | null;
+  prediction_timestamp: string | null;
+  message: string | null;
   prediction_horizon: string;
   data_source: string;
 };
 
+export type MarketQuoteSnapshot = {
+  symbol: string;
+  current_price: number;
+  change: number | null;
+  change_percent: number | null;
+  high: number | null;
+  low: number | null;
+  open: number | null;
+  previous_close: number | null;
+  volume: number | null;
+  regular_price: number | null;
+  extended_hours_price: number | null;
+  has_extended_hours_activity: boolean;
+  extended_hours_status: "ACTIVE" | "WAITING" | "NONE";
+  extended_hours_source: string | null;
+  market_session: MarketSession;
+  next_market_open: string | null;
+  market_timezone: string;
+  timestamp: string;
+  source: string;
+};
+
+export type MarketSession = "PRE_MARKET" | "OPEN" | "AFTER_HOURS" | "CLOSED";
+
 export type ChatRole = "user" | "assistant";
+
+export type ChatSource = {
+  id: number | null;
+  stock_symbol: string | null;
+  source_name: string;
+  title: string;
+  published_at: string | null;
+  url: string | null;
+};
 
 export type ChatMessage = {
   id: number;
   role: ChatRole;
   content: string;
   created_at: string;
+  stock_symbol: string | null;
+  confidence_score: number | null;
+  sources: ChatSource[];
 };
 
 export type ChatSession = {
@@ -225,6 +262,11 @@ export function getStockPrediction(ticker: string) {
   return apiRequest<StockPrediction>(`/stocks/${ticker}/prediction`);
 }
 
+export function getMarketQuotes(symbols: string[]) {
+  const params = new URLSearchParams({ symbols: symbols.join(",") });
+  return apiRequest<MarketQuoteSnapshot[]>(`/market/quotes?${params.toString()}`);
+}
+
 export function getChatSessions() {
   return apiRequest<ChatSession[]>("/chat/sessions");
 }
@@ -240,6 +282,12 @@ export function getChatSession(sessionId: number) {
   return apiRequest<ChatSessionDetail>(`/chat/sessions/${sessionId}`);
 }
 
+export function deleteChatSession(sessionId: number) {
+  return apiRequest<void>(`/chat/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+}
+
 export function sendChatMessage(sessionId: number, input: { content: string }) {
   return apiRequest<ChatExchangeResponse>(`/chat/sessions/${sessionId}/messages`, {
     method: "POST",
@@ -252,6 +300,10 @@ export function createWatchlist(input: { name: string }) {
     method: "POST",
     body: input,
   });
+}
+
+export function getWatchlists() {
+  return apiRequest<Watchlist[]>("/watchlists");
 }
 
 export function addStockToWatchlist(watchlistId: number, input: { ticker: string }) {

@@ -12,6 +12,7 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 import { getStockHistory, type HistoricalPricePoint, type StockHistoryRange } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +52,7 @@ function latestPoint(prices: HistoricalPricePoint[]) {
 export function StockPriceChart({ ticker }: StockPriceChartProps) {
   const [selectedRange, setSelectedRange] = useState<StockHistoryRange>("1mo");
   const [prices, setPrices] = useState<HistoricalPricePoint[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -59,7 +60,6 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
 
     async function loadHistory() {
       setIsLoading(true);
-      setError(null);
 
       try {
         const history = await getStockHistory(ticker, selectedRange);
@@ -70,7 +70,7 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
       } catch (caughtError) {
         if (isActive) {
           setPrices([]);
-          setError(caughtError instanceof Error ? caughtError.message : "Unable to load historical prices");
+          showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to load historical prices" });
         }
       } finally {
         if (isActive) {
@@ -84,7 +84,7 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
     return () => {
       isActive = false;
     };
-  }, [selectedRange, ticker]);
+  }, [selectedRange, showToast, ticker]);
 
   const chartData = useMemo(
     () =>
@@ -137,8 +137,8 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
         <div className="h-[340px] rounded-md border bg-background/30 p-3">
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading chart...</div>
-          ) : error ? (
-            <div className="flex h-full items-center justify-center text-center text-sm text-destructive">{error}</div>
+          ) : prices.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">No historical prices available.</div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ left: 8, right: 8, top: 12, bottom: 0 }}>
@@ -206,3 +206,5 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
     </section>
   );
 }
+
+

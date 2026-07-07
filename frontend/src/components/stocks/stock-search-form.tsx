@@ -7,16 +7,16 @@ import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import { searchStocks, type StockSearchResult } from "@/lib/api";
 
 export function StockSearchForm() {
   const [results, setResults] = useState<StockSearchResult[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const { showToast } = useToast();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setIsSearching(true);
 
     const formData = new FormData(event.currentTarget);
@@ -27,7 +27,7 @@ export function StockSearchForm() {
       setResults(searchResults);
     } catch (caughtError) {
       setResults([]);
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to search ticker");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to search stocks" });
     } finally {
       setIsSearching(false);
     }
@@ -39,11 +39,11 @@ export function StockSearchForm() {
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
-            className="pl-9 uppercase"
+            className="pl-9"
             name="query"
-            placeholder="Search ticker, e.g. NVDA"
+            placeholder="Search company or ticker, e.g. Nvidia or NVDA"
             autoComplete="off"
-            maxLength={12}
+            maxLength={64}
             required
           />
         </div>
@@ -51,8 +51,6 @@ export function StockSearchForm() {
           {isSearching ? "Searching..." : "Search"}
         </Button>
       </form>
-
-      {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
 
       {results.length > 0 ? (
         <div className="overflow-hidden rounded-md border">

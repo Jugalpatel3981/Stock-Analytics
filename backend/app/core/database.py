@@ -4,7 +4,7 @@ from app.core.config import get_settings
 from app.models.base import Base
 
 # Import model modules so SQLAlchemy metadata knows about tables during create_all.
-from app.models import chat, portfolio, user, watchlist  # noqa: F401
+from app.models import chat, market_data, ml, portfolio, user, watchlist  # noqa: F401
 
 settings = get_settings()
 
@@ -25,3 +25,4 @@ async_session_factory = async_sessionmaker(
 async def create_database_tables() -> None:
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+

@@ -3,8 +3,16 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
 
-export default async function AssistantPage() {
+type AssistantPageProps = {
+  searchParams?: Promise<{ prompt?: string | string[] }>;
+};
+
+export default async function AssistantPage({ searchParams }: AssistantPageProps) {
   const user = await requireAuthenticatedUser();
+  const resolvedSearchParams = await searchParams;
+  const initialPrompt = Array.isArray(resolvedSearchParams?.prompt)
+    ? resolvedSearchParams?.prompt[0]
+    : resolvedSearchParams?.prompt;
 
   return (
     <DashboardShell userName={user.name} activeItem="AI Assistant">
@@ -20,7 +28,7 @@ export default async function AssistantPage() {
           <Badge variant="secondary">Informational only</Badge>
         </div>
 
-        <AiChat />
+        <AiChat initialPrompt={initialPrompt} />
       </div>
     </DashboardShell>
   );

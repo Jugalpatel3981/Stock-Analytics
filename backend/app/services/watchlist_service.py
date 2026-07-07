@@ -63,6 +63,7 @@ async def add_stock_to_watchlist(
 
     session.add(WatchlistStock(watchlist_id=watchlist.id, ticker=normalized_ticker))
     await session.commit()
+    session.expire_all()
 
     return await get_watchlist(session, user_id, watchlist_id)
 
@@ -85,5 +86,6 @@ async def remove_stock_from_watchlist(
 
     await session.delete(stock_to_remove)
     await session.commit()
+    session.expire_all()
 
     return await get_watchlist(session, user_id, watchlist_id)

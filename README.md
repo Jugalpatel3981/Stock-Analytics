@@ -1,4 +1,4 @@
-# AI Stock Intelligence Platform
+﻿# AI Stock Intelligence Platform
 
 AI Stock Intelligence Platform is a full-stack portfolio project for stock research, portfolio tracking, market news, AI sentiment analysis, AI-assisted financial research, and experimental price prediction.
 
@@ -15,9 +15,10 @@ It is built as a production-minded monorepo with a Next.js frontend, FastAPI bac
 - Recharts price visualization
 - Watchlists
 - Portfolio holdings, gain/loss, and growth chart
+- Finnhub WebSocket-powered live prices for dashboard, stocks, watchlists, and portfolio
 - Stock news filtered by ticker
 - HuggingFace-powered news sentiment analysis
-- OpenAI-powered financial assistant with saved chat history
+- OpenAI-powered financial assistant with saved chat history, follow-up support, web research, and source citations
 - XGBoost next-day close prediction module
 - Dockerized frontend, backend, and PostgreSQL
 - GitHub Actions CI
@@ -30,7 +31,8 @@ It is built as a production-minded monorepo with a Next.js frontend, FastAPI bac
 | Frontend | Next.js 15, TypeScript, Tailwind CSS, ShadCN UI conventions |
 | Backend | FastAPI, Python 3.12, Pydantic Settings |
 | Database | PostgreSQL, SQLAlchemy async |
-| AI | OpenAI Responses API, HuggingFace sentiment model |
+| AI | OpenAI/Grok Responses APIs, HuggingFace sentiment model, Tavily Search |
+| Market Data | Yahoo Finance, Finnhub WebSocket |
 | ML | XGBoost, pandas, numpy, scikit-learn |
 | Charts | Recharts |
 | Infrastructure | Docker, Docker Compose |
@@ -140,8 +142,14 @@ Optional AI variables:
 ```text
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile
 HUGGINGFACE_API_TOKEN=
 HUGGINGFACE_SENTIMENT_MODEL=ProsusAI/finbert
+TAVILY_API_KEY=
+TAVILY_SEARCH_DEPTH=basic
+FINNHUB_API_KEY=
+NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
 ```
 
 ## Testing
@@ -184,6 +192,8 @@ Docker build checks are included in GitHub Actions.
 | History | `GET /api/v1/stocks/NVDA/history?range=1mo` |
 | News | `GET /api/v1/stocks/news?ticker=NVDA` |
 | Prediction | `GET /api/v1/stocks/NVDA/prediction` |
+| Market Snapshot | `GET /api/v1/market/quotes?symbols=NVDA,AAPL` |
+| Live Market Stream | `WS /api/v1/market/stream?symbols=NVDA,AAPL` |
 | Watchlists | `GET /api/v1/watchlists`, `POST /api/v1/watchlists` |
 | Portfolio | `GET /api/v1/portfolio/holdings`, `GET /api/v1/portfolio/growth` |
 | Assistant | `GET /api/v1/chat/sessions`, `POST /api/v1/chat/sessions/{id}/messages` |
@@ -226,8 +236,9 @@ Before deploying for real:
 Phase documentation is available in `docs/`:
 
 - `docs/phase-1.md`
-- `docs/phase-3.md` through `docs/phase-12.md`
+- `docs/phase-3.md` through `docs/phase-13.md`
 
 ## License
 
 Portfolio project. Add a license before public production release if needed.
+

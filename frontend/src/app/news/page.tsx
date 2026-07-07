@@ -4,8 +4,17 @@ import { StockNewsFeed } from "@/components/news/stock-news-feed";
 import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
 
-export default async function NewsPage() {
+type NewsPageProps = {
+  searchParams?: Promise<{ ticker?: string | string[] }>;
+};
+
+export default async function NewsPage({ searchParams }: NewsPageProps) {
   const user = await requireAuthenticatedUser();
+  const resolvedSearchParams = await searchParams;
+  const tickerParam = Array.isArray(resolvedSearchParams?.ticker)
+    ? resolvedSearchParams?.ticker[0]
+    : resolvedSearchParams?.ticker;
+  const initialTicker = tickerParam?.trim().toUpperCase() || "NVDA";
 
   return (
     <DashboardShell userName={user.name} activeItem="News">
@@ -23,7 +32,7 @@ export default async function NewsPage() {
           description="Yahoo Finance headlines filtered by ticker"
           action={<Badge variant="secondary">Informational</Badge>}
         >
-          <StockNewsFeed initialTicker="NVDA" />
+          <StockNewsFeed initialTicker={initialTicker} />
         </SectionPanel>
       </div>
     </DashboardShell>

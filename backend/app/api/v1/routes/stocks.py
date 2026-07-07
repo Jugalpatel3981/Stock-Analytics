@@ -1,8 +1,9 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db_session
 from app.models.user import User
 from app.schemas.stock import (
     StockDetail,
@@ -18,10 +19,10 @@ router = APIRouter()
 
 @router.get("/search", response_model=list[StockSearchResult])
 async def search_stocks(
-    query: str = Query(min_length=1, max_length=12),
+    query: str = Query(min_length=1, max_length=64),
     _: User = Depends(get_current_user),
 ) -> list[StockSearchResult]:
-    return await stock_service.search_stock_by_ticker(query)
+    return await stock_service.search_stocks(query)
 
 
 @router.get("/news", response_model=StockNewsResponse)
@@ -54,5 +55,8 @@ async def read_stock_history(
 async def read_stock_prediction(
     ticker: str,
     _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> StockPredictionResponse:
-    return await prediction_service.get_stock_prediction(ticker)
+    return await prediction_service.get_prediction(session, ticker)
+
+

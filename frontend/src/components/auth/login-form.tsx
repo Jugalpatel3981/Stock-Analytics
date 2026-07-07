@@ -6,16 +6,16 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import { loginUser } from "@/lib/api";
 
 export function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -28,7 +28,7 @@ export function LoginForm() {
       router.push("/dashboard");
       router.refresh();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to sign in");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to sign in" });
     } finally {
       setIsSubmitting(false);
     }
@@ -44,7 +44,6 @@ export function LoginForm() {
         <label className="text-sm font-medium" htmlFor="password">Password</label>
         <Input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
-      {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
       <Button className="w-full" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Signing in..." : "Sign in"}
       </Button>

@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, ExternalLink } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { SectionPanel } from "@/components/dashboard/section-panel";
+import { LiveStockCard } from "@/components/market/live-stock-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StockPriceChart } from "@/components/stocks/stock-price-chart";
@@ -109,11 +110,13 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
                 {stock.company_name ?? "Company name unavailable"}
               </p>
             </div>
-            <div className="rounded-md border bg-background/40 p-4 text-right">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Current Price</p>
-              <p className="mt-2 text-3xl font-semibold">{formatCurrency(stock.current_price, stock.currency)}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{stock.currency ?? "Currency unavailable"}</p>
-            </div>
+            <LiveStockCard
+              symbol={stock.ticker}
+              company={stock.company_name}
+              initialPrice={stock.current_price}
+              initialVolume={stock.volume}
+              currency={stock.currency}
+            />
           </div>
         </section>
 

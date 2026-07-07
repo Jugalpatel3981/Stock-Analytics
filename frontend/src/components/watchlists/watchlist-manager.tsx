@@ -3,17 +3,24 @@
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { LiveBadge } from "@/components/market/live-badge";
+import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
+import { LivePrice } from "@/components/market/live-price";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import {
   addStockToWatchlist,
   createWatchlist,
   removeStockFromWatchlist,
+  searchStocks,
   type Watchlist,
+  type StockSearchResult,
+  type WatchlistStock,
 } from "@/lib/api";
+import { useMarketStream } from "@/lib/market-stream";
 
 type WatchlistManagerProps = {
   initialWatchlists: Watchlist[];
@@ -21,13 +28,16 @@ type WatchlistManagerProps = {
 
 export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
   const [watchlists, setWatchlists] = useState(initialWatchlists);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
   const [activeMutation, setActiveMutation] = useState<string | null>(null);
+  const [searchResultsByWatchlist, setSearchResultsByWatchlist] = useState<Record<number, StockSearchResult[]>>({});
+  const [searchingWatchlistId, setSearchingWatchlistId] = useState<number | null>(null);
+  const trackedSymbols = Array.from(new Set(watchlists.flatMap((watchlist) => watchlist.stocks.map((stock) => stock.ticker))));
+  const { quotes, status, error: streamError, lastUpdated, marketSession, nextMarketOpen, hasExtendedHoursActivity } = useMarketStream(trackedSymbols);
 
   async function handleCreateWatchlist(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setIsCreating(true);
 
     const form = event.currentTarget;
@@ -39,37 +49,92 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
       setWatchlists((current) => [createdWatchlist, ...current]);
       form.reset();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to create watchlist");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to create watchlist" });
     } finally {
       setIsCreating(false);
     }
   }
 
-  async function handleAddStock(event: FormEvent<HTMLFormElement>, watchlistId: number) {
-    event.preventDefault();
-    setError(null);
-    setActiveMutation(`add-${watchlistId}`);
+  async function addTickerToWatchlist(watchlistId: number, ticker: string) {
+    const normalizedTicker = ticker.trim().toUpperCase();
+    if (!normalizedTicker) {
+      return;
+    }
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const ticker = String(formData.get("ticker") ?? "").trim().toUpperCase();
+    const targetWatchlist = watchlists.find((watchlist) => watchlist.id === watchlistId);
+    if (targetWatchlist?.stocks.some((stock) => stock.ticker === normalizedTicker)) {
+      showToast({ message: `${normalizedTicker} is already in this watchlist` });
+      return;
+    }
+    setActiveMutation(`add-${watchlistId}`);
+    const previousWatchlists = watchlists;
+    const optimisticStock: WatchlistStock = {
+      id: -Date.now(),
+      ticker: normalizedTicker,
+      added_at: new Date().toISOString(),
+    };
+
+    setWatchlists((current) =>
+      current.map((watchlist) =>
+        watchlist.id === watchlistId
+          ? {
+              ...watchlist,
+              stocks: [...watchlist.stocks, optimisticStock],
+            }
+          : watchlist,
+      ),
+    );
+    setSearchResultsByWatchlist((current) => ({ ...current, [watchlistId]: [] }));
 
     try {
-      const updatedWatchlist = await addStockToWatchlist(watchlistId, { ticker });
+      const updatedWatchlist = await addStockToWatchlist(watchlistId, { ticker: normalizedTicker });
       setWatchlists((current) =>
         current.map((watchlist) => (watchlist.id === watchlistId ? updatedWatchlist : watchlist)),
       );
-      form.reset();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to add stock");
+      setWatchlists(previousWatchlists);
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to add stock" });
     } finally {
       setActiveMutation(null);
     }
   }
 
+  async function handleSearchStocks(event: FormEvent<HTMLFormElement>, watchlistId: number) {
+    event.preventDefault();
+    setSearchingWatchlistId(watchlistId);
+
+    const formData = new FormData(event.currentTarget);
+    const query = String(formData.get("ticker") ?? "").trim();
+
+    if (!query) {
+      setSearchingWatchlistId(null);
+      return;
+    }
+
+    try {
+      const results = await searchStocks(query);
+      setSearchResultsByWatchlist((current) => ({ ...current, [watchlistId]: results }));
+    } catch (caughtError) {
+      setSearchResultsByWatchlist((current) => ({ ...current, [watchlistId]: [] }));
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to search stocks" });
+    } finally {
+      setSearchingWatchlistId(null);
+    }
+  }
   async function handleRemoveStock(watchlistId: number, ticker: string) {
-    setError(null);
     setActiveMutation(`remove-${watchlistId}-${ticker}`);
+
+    const previousWatchlists = watchlists;
+    setWatchlists((current) =>
+      current.map((watchlist) =>
+        watchlist.id === watchlistId
+          ? {
+              ...watchlist,
+              stocks: watchlist.stocks.filter((stock) => stock.ticker !== ticker),
+            }
+          : watchlist,
+      ),
+    );
 
     try {
       const updatedWatchlist = await removeStockFromWatchlist(watchlistId, ticker);
@@ -77,12 +142,12 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
         current.map((watchlist) => (watchlist.id === watchlistId ? updatedWatchlist : watchlist)),
       );
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to remove stock");
+      setWatchlists(previousWatchlists);
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to remove stock" });
     } finally {
       setActiveMutation(null);
     }
   }
-
   return (
     <div className="space-y-5">
       <section className="rounded-lg border bg-card/80 p-5">
@@ -99,7 +164,6 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
             </Button>
           </form>
         </div>
-        {error ? <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
       </section>
 
       {watchlists.length === 0 ? (
@@ -117,15 +181,51 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
                     <h2 className="text-base font-semibold">{watchlist.name}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{watchlist.stocks.length} stocks tracked</p>
                   </div>
-                  <Badge variant="secondary">Watchlist</Badge>
+                  <LiveBadge
+                    status={status}
+                    lastUpdated={lastUpdated}
+                    marketSession={marketSession}
+                    nextMarketOpen={nextMarketOpen}
+                    hasExtendedHoursActivity={hasExtendedHoursActivity}
+                  />
                 </div>
-                <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => handleAddStock(event, watchlist.id)}>
-                  <Input className="uppercase" name="ticker" placeholder="Ticker, e.g. NVDA" maxLength={12} required />
-                  <Button type="submit" variant="secondary" disabled={activeMutation === `add-${watchlist.id}`}>
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Add
+                <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => handleSearchStocks(event, watchlist.id)}>
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <Input name="ticker" className="pl-9" placeholder="Search company or ticker, e.g. Nvidia" maxLength={64} required />
+                  </div>
+                  <Button type="submit" variant="secondary" disabled={searchingWatchlistId === watchlist.id}>
+                    <Search className="h-4 w-4" aria-hidden="true" />
+                    {searchingWatchlistId === watchlist.id ? "Searching..." : "Search"}
                   </Button>
                 </form>
+
+                {searchResultsByWatchlist[watchlist.id]?.length ? (
+                  <div className="mt-3 overflow-hidden rounded-md border bg-background/40">
+                    {searchResultsByWatchlist[watchlist.id].map((result) => (
+                      <div
+                        key={result.ticker}
+                        className="grid gap-3 border-b px-3 py-3 text-sm last:border-b-0 sm:grid-cols-[0.8fr_1.5fr_auto] sm:items-center"
+                      >
+                        <div>
+                          <p className="font-semibold text-primary">{result.ticker}</p>
+                          <p className="text-xs text-muted-foreground">{result.exchange ?? result.currency ?? "Yahoo"}</p>
+                        </div>
+                        <p className="text-muted-foreground">{result.company_name ?? "Company unavailable"}</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addTickerToWatchlist(watchlist.id, result.ticker)}
+                          disabled={activeMutation === `add-${watchlist.id}`}
+                        >
+                          <Plus className="h-4 w-4" aria-hidden="true" />
+                          Add
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="p-5">
@@ -134,10 +234,14 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
                 ) : (
                   <div className="space-y-2">
                     {watchlist.stocks.map((stock) => (
-                      <div key={stock.id} className="flex items-center justify-between gap-3 rounded-md border bg-background/40 px-4 py-3">
-                        <Link className="font-semibold text-primary hover:underline" href={`/stocks/${stock.ticker}`}>
-                          {stock.ticker}
-                        </Link>
+                      <div key={stock.id} className="grid gap-3 rounded-md border bg-background/40 px-4 py-3 sm:grid-cols-[1fr_1.5fr_auto] sm:items-center">
+                        <div>
+                          <Link className="font-semibold text-primary hover:underline" href={`/stocks/${stock.ticker}`}>
+                            {stock.ticker}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">Live gain/loss indicator</p>
+                        </div>
+                        <LivePrice quote={quotes[stock.ticker]} compact />
                         <Button
                           type="button"
                           variant="ghost"
@@ -152,6 +256,7 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
                     ))}
                   </div>
                 )}
+                <MarketStreamErrorToast error={streamError} />
               </div>
             </section>
           ))}
@@ -160,3 +265,6 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
     </div>
   );
 }
+
+
+

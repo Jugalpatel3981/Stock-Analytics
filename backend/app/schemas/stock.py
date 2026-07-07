@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -70,12 +72,15 @@ class StockNewsResponse(BaseModel):
 
 class StockPredictionResponse(BaseModel):
     ticker: str
-    predicted_close: float
-    latest_close: float
-    confidence_score: float
-    historical_accuracy: float
-    training_rows: int
-    feature_summary: list[str]
-    model_name: str = "XGBoost Regressor"
+    status: Literal["ready", "preparing"] = "ready"
+    predicted_close: float | None = None
+    latest_close: float | None = None
+    expected_price_low: float | None = None
+    expected_price_high: float | None = None
+    confidence_score: float | None = None
+    prediction_timestamp: str | None = None
+    message: str | None = None
     prediction_horizon: str = "Next trading day close"
-    data_source: str = "Yahoo Finance via yfinance"
+    data_source: str = "Production ML pipeline"
+
+

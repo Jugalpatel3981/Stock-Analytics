@@ -2,20 +2,25 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
+import { LiveBadge } from "@/components/market/live-badge";
+import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
 import { PortfolioGrowthChart } from "@/components/portfolio/portfolio-growth-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import {
   createPortfolioHolding,
   deletePortfolioHolding,
   getPortfolioGrowth,
   getPortfolioSummary,
   type PortfolioGrowthPoint,
+  type PortfolioHolding,
   type PortfolioSummary,
 } from "@/lib/api";
+import { useMarketStream } from "@/lib/market-stream";
 
 type PortfolioManagerProps = {
   initialSummary: PortfolioSummary;
@@ -45,9 +50,19 @@ function formatPercent(value: number | null) {
 export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioManagerProps) {
   const [summary, setSummary] = useState(initialSummary);
   const [growth, setGrowth] = useState(initialGrowth);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeDelete, setActiveDelete] = useState<number | null>(null);
+  const trackedSymbols = Array.from(new Set(summary.holdings.map((holding) => holding.symbol)));
+  const initialPrices = useMemo(
+    () =>
+      summary.holdings.reduce<Record<string, number | null>>((prices, holding) => {
+        prices[holding.symbol] = holding.current_price;
+        return prices;
+      }, {}),
+    [summary.holdings],
+  );
+  const { quotes, status, error: streamError, lastUpdated, marketSession, nextMarketOpen, hasExtendedHoursActivity } = useMarketStream(trackedSymbols, { initialPrices });
 
   async function refreshPortfolio() {
     const [updatedSummary, updatedGrowth] = await Promise.all([
@@ -60,7 +75,6 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
 
   async function handleCreateHolding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setIsSubmitting(true);
 
     const form = event.currentTarget;
@@ -76,31 +90,48 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
       await refreshPortfolio();
       form.reset();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to add holding");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to add holding" });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleDeleteHolding(holdingId: number) {
-    setError(null);
     setActiveDelete(holdingId);
 
     try {
       await deletePortfolioHolding(holdingId);
       await refreshPortfolio();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to remove holding");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to remove holding" });
     } finally {
       setActiveDelete(null);
     }
   }
 
+  const liveHoldings = summary.holdings.map((holding): PortfolioHolding => {
+    const livePrice = quotes[holding.symbol]?.price ?? holding.current_price;
+    const currentValue = livePrice === null ? holding.current_value : livePrice * holding.quantity;
+    const gainLoss = currentValue === null ? holding.gain_loss : currentValue - holding.cost_basis;
+    const percentageReturn = gainLoss === null ? holding.percentage_return : (gainLoss / holding.cost_basis) * 100;
+
+    return {
+      ...holding,
+      current_price: livePrice,
+      current_value: currentValue,
+      gain_loss: gainLoss,
+      percentage_return: percentageReturn,
+    };
+  });
+  const liveTotalValue = liveHoldings.reduce((total, holding) => total + (holding.current_value ?? 0), 0);
+  const liveTotalGainLoss = liveTotalValue - summary.total_cost;
+  const liveTotalReturn = summary.total_cost ? (liveTotalGainLoss / summary.total_cost) * 100 : 0;
+
   const statCards = [
-    { label: "Current Value", value: formatCurrency(summary.total_value) },
+    { label: "Current Value", value: formatCurrency(liveTotalValue) },
     { label: "Cost Basis", value: formatCurrency(summary.total_cost) },
-    { label: "Gain/Loss", value: formatCurrency(summary.total_gain_loss) },
-    { label: "Return", value: formatPercent(summary.total_percentage_return) },
+    { label: "Gain/Loss", value: formatCurrency(liveTotalGainLoss) },
+    { label: "Return", value: formatPercent(liveTotalReturn) },
   ];
 
   return (
@@ -129,7 +160,6 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
             {isSubmitting ? "Adding..." : "Add"}
           </Button>
         </form>
-        {error ? <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p> : null}
       </section>
 
       <section className="rounded-lg border bg-card/80">
@@ -144,8 +174,20 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
 
       <section className="rounded-lg border bg-card/80">
         <div className="border-b p-5">
-          <h2 className="text-base font-semibold">Holdings Table</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Current value, gain/loss, and percentage return.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Holdings Table</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Live value, gain/loss, and percentage return.</p>
+            </div>
+            <LiveBadge
+              status={status}
+              lastUpdated={lastUpdated}
+              marketSession={marketSession}
+              nextMarketOpen={nextMarketOpen}
+              hasExtendedHoursActivity={hasExtendedHoursActivity}
+            />
+          </div>
+          <MarketStreamErrorToast error={streamError} />
         </div>
         <div className="overflow-x-auto">
           <div className="min-w-[920px]">
@@ -163,7 +205,7 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
             {summary.holdings.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">No holdings added yet.</div>
             ) : (
-              summary.holdings.map((holding) => (
+              liveHoldings.map((holding) => (
                 <div
                   key={holding.id}
                   className="grid grid-cols-[0.8fr_0.8fr_0.9fr_0.9fr_1fr_1fr_1fr_0.9fr_0.7fr] items-center border-t px-4 py-4 text-sm"
@@ -202,3 +244,5 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
     </div>
   );
 }
+
+

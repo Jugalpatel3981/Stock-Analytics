@@ -1,12 +1,14 @@
 "use client";
 
-import { Bot, MessageSquare, PlusCircle, Send, UserRound } from "lucide-react";
+import { Bot, ExternalLink, MessageSquare, PlusCircle, Send, Trash2, UserRound } from "lucide-react";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 import {
   createChatSession,
+  deleteChatSession,
   getChatSession,
   getChatSessions,
   sendChatMessage,
@@ -19,6 +21,7 @@ const suggestedPrompts = [
   "Why did Tesla move today?",
   "Summarize Nvidia news.",
   "What is Apple's current sentiment?",
+  "What are investors worried about regarding Apple?",
 ];
 
 function formatTime(value: string) {
@@ -28,18 +31,22 @@ function formatTime(value: string) {
   });
 }
 
-export function AiChat() {
+type AiChatProps = {
+  initialPrompt?: string;
+};
+
+export function AiChat({ initialPrompt }: AiChatProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const loadSession = useCallback(async (sessionId: number) => {
-    setError(null);
     const detail = await getChatSession(sessionId);
     setActiveSession({
       id: detail.id,
@@ -52,21 +59,23 @@ export function AiChat() {
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
 
     try {
       const loadedSessions = await getChatSessions();
       setSessions(loadedSessions);
 
-      if (loadedSessions.length > 0) {
+      if (initialPrompt) {
+        setActiveSession(null);
+        setMessages([]);
+      } else if (loadedSessions.length > 0) {
         await loadSession(loadedSessions[0].id);
       }
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to load chat history");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to load chat history" });
     } finally {
       setIsLoading(false);
     }
-  }, [loadSession]);
+  }, [initialPrompt, loadSession, showToast]);
 
   useEffect(() => {
     loadSessions();
@@ -76,8 +85,13 @@ export function AiChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isSending]);
 
+  useEffect(() => {
+    if (initialPrompt) {
+      setDraft(initialPrompt);
+    }
+  }, [initialPrompt]);
+
   async function handleNewChat() {
-    setError(null);
 
     try {
       const session = await createChatSession({ title: "New AI chat" });
@@ -86,7 +100,7 @@ export function AiChat() {
       setMessages([]);
       setDraft("");
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to create chat");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to create chat" });
     }
   }
 
@@ -110,7 +124,6 @@ export function AiChat() {
     }
 
     setIsSending(true);
-    setError(null);
     setDraft("");
 
     try {
@@ -129,7 +142,7 @@ export function AiChat() {
       });
     } catch (caughtError) {
       setDraft(content);
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to send message");
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to send message" });
     } finally {
       setIsSending(false);
     }
@@ -137,6 +150,34 @@ export function AiChat() {
 
   async function handleSuggestedPrompt(prompt: string) {
     setDraft(prompt);
+  }
+
+  async function handleDeleteSession(sessionId: number) {
+    setDeletingSessionId(sessionId);
+
+    try {
+      await deleteChatSession(sessionId);
+      const remainingSessions = sessions.filter((session) => session.id !== sessionId);
+      setSessions(remainingSessions);
+
+      if (activeSession?.id === sessionId) {
+        const nextSession = remainingSessions[0];
+
+        if (nextSession) {
+          await loadSession(nextSession.id);
+        } else {
+          setActiveSession(null);
+          setMessages([]);
+          setDraft("");
+        }
+      }
+
+      showToast({ message: "Chat deleted" });
+    } catch (caughtError) {
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to delete chat" });
+    } finally {
+      setDeletingSessionId(null);
+    }
   }
 
   return (
@@ -159,18 +200,33 @@ export function AiChat() {
             <p className="px-2 py-3 text-sm text-muted-foreground">No saved chats yet.</p>
           ) : (
             sessions.map((session) => (
-              <button
+              <div
                 key={session.id}
-                type="button"
                 className={cn(
-                  "flex w-full items-start gap-2 rounded-md px-3 py-3 text-left text-sm transition-colors hover:bg-secondary",
+                  "group flex items-start gap-1 rounded-md transition-colors hover:bg-secondary",
                   activeSession?.id === session.id && "bg-secondary",
                 )}
-                onClick={() => loadSession(session.id)}
               >
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="line-clamp-2">{session.title}</span>
-              </button>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-start gap-2 px-3 py-3 text-left text-sm"
+                  onClick={() => loadSession(session.id)}
+                >
+                  <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="line-clamp-2">{session.title}</span>
+                </button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="mr-1 mt-1 h-8 w-8 shrink-0 text-muted-foreground opacity-70 hover:text-destructive hover:opacity-100"
+                  onClick={() => handleDeleteSession(session.id)}
+                  disabled={deletingSessionId === session.id}
+                  aria-label={`Delete ${session.title}`}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
             ))
           )}
         </div>
@@ -237,6 +293,40 @@ export function AiChat() {
                   )}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
+                  {message.role === "assistant" && message.sources.length > 0 ? (
+                    <div className="mt-4 rounded-md border bg-card/70 p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Sources</p>
+                        {message.confidence_score ? (
+                          <span className="text-xs text-muted-foreground">Confidence {message.confidence_score}%</span>
+                        ) : null}
+                      </div>
+                      <div className="space-y-2">
+                        {message.sources.map((source, index) => (
+                          <div key={`${source.url ?? source.title}-${index}`} className="text-xs leading-5">
+                            <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                              <span>{source.source_name}</span>
+                              {source.stock_symbol ? <span>{source.stock_symbol}</span> : null}
+                              {source.published_at ? <span>{source.published_at}</span> : null}
+                            </div>
+                            {source.url ? (
+                              <a
+                                className="mt-1 inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                                href={source.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {source.title}
+                                <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                              </a>
+                            ) : (
+                              <p className="mt-1 font-medium">{source.title}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <p
                     className={cn(
                       "mt-2 text-xs",
@@ -267,11 +357,6 @@ export function AiChat() {
         </div>
 
         <div className="border-t p-4">
-          {error ? (
-            <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
           <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleSubmit}>
             <textarea
               className="min-h-24 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
