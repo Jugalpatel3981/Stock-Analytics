@@ -53,10 +53,26 @@ def _stats_from_candle_payload(payload: dict[str, Any]) -> dict[str, float | int
     if payload.get("s") != "ok":
         return {}
 
-    opens = [value for value in (to_float(item) for item in _candle_values(payload, "o")) if value is not None]
-    highs = [value for value in (to_float(item) for item in _candle_values(payload, "h")) if value is not None]
-    lows = [value for value in (to_float(item) for item in _candle_values(payload, "l")) if value is not None]
-    volumes = [value for value in (to_int(item) for item in _candle_values(payload, "v")) if value is not None]
+    opens = [
+        value
+        for value in (to_float(item) for item in _candle_values(payload, "o"))
+        if value is not None
+    ]
+    highs = [
+        value
+        for value in (to_float(item) for item in _candle_values(payload, "h"))
+        if value is not None
+    ]
+    lows = [
+        value
+        for value in (to_float(item) for item in _candle_values(payload, "l"))
+        if value is not None
+    ]
+    volumes = [
+        value
+        for value in (to_int(item) for item in _candle_values(payload, "v"))
+        if value is not None
+    ]
 
     return {
         "open": opens[0] if opens else None,
@@ -66,7 +82,9 @@ def _stats_from_candle_payload(payload: dict[str, Any]) -> dict[str, float | int
     }
 
 
-def _quote_from_yahoo_payload(payload: dict[str, Any], market_session: MarketSession) -> dict[str, float | str | None] | None:
+def _quote_from_yahoo_payload(
+    payload: dict[str, Any], market_session: MarketSession
+) -> dict[str, float | str | None] | None:
     if market_session == "PRE_MARKET":
         price = to_float(payload.get("preMarketPrice"))
         change = to_float(payload.get("preMarketChange"))
@@ -108,7 +126,9 @@ def _quote_from_yahoo_payload(payload: dict[str, Any], market_session: MarketSes
     }
 
 
-def enrich_with_yahoo_market_stats(quote: MarketQuote, yahoo_payload: dict[str, Any] | None) -> MarketQuote:
+def enrich_with_yahoo_market_stats(
+    quote: MarketQuote, yahoo_payload: dict[str, Any] | None
+) -> MarketQuote:
     if yahoo_payload is None:
         return quote
 
@@ -116,9 +136,17 @@ def enrich_with_yahoo_market_stats(quote: MarketQuote, yahoo_payload: dict[str, 
     open_price = quote.open or to_float(yahoo_payload.get("regularMarketOpen"))
     high = quote.high or to_float(yahoo_payload.get("regularMarketDayHigh"))
     low = quote.low or to_float(yahoo_payload.get("regularMarketDayLow"))
-    previous_close = quote.previous_close or to_float(yahoo_payload.get("regularMarketPreviousClose"))
+    previous_close = quote.previous_close or to_float(
+        yahoo_payload.get("regularMarketPreviousClose")
+    )
 
-    if volume == quote.volume and open_price == quote.open and high == quote.high and low == quote.low and previous_close == quote.previous_close:
+    if (
+        volume == quote.volume
+        and open_price == quote.open
+        and high == quote.high
+        and low == quote.low
+        and previous_close == quote.previous_close
+    ):
         return quote
 
     return quote.model_copy(
@@ -132,7 +160,10 @@ def enrich_with_yahoo_market_stats(quote: MarketQuote, yahoo_payload: dict[str, 
         }
     )
 
-def enrich_with_yfinance_market_stats(quote: MarketQuote, stats: dict[str, float | int | None] | None) -> MarketQuote:
+
+def enrich_with_yfinance_market_stats(
+    quote: MarketQuote, stats: dict[str, float | int | None] | None
+) -> MarketQuote:
     if not stats:
         return quote
 
@@ -142,7 +173,13 @@ def enrich_with_yfinance_market_stats(quote: MarketQuote, stats: dict[str, float
     low = quote.low or to_float(stats.get("low"))
     previous_close = quote.previous_close or to_float(stats.get("previous_close"))
 
-    if volume == quote.volume and open_price == quote.open and high == quote.high and low == quote.low and previous_close == quote.previous_close:
+    if (
+        volume == quote.volume
+        and open_price == quote.open
+        and high == quote.high
+        and low == quote.low
+        and previous_close == quote.previous_close
+    ):
         return quote
 
     return quote.model_copy(
@@ -157,7 +194,9 @@ def enrich_with_yfinance_market_stats(quote: MarketQuote, stats: dict[str, float
     )
 
 
-async def _fetch_yfinance_market_stats(symbols: list[str]) -> dict[str, dict[str, float | int | None]]:
+async def _fetch_yfinance_market_stats(
+    symbols: list[str],
+) -> dict[str, dict[str, float | int | None]]:
     from app.services.stock_service import get_stock_market_stats
 
     results = await asyncio.gather(
@@ -171,8 +210,15 @@ async def _fetch_yfinance_market_stats(symbols: list[str]) -> dict[str, dict[str
         if isinstance(result, dict)
     }
 
-def enrich_with_yahoo_extended_hours(quote: MarketQuote, yahoo_payload: dict[str, Any] | None) -> MarketQuote:
-    if quote.has_extended_hours_activity or quote.market_session not in ("PRE_MARKET", "AFTER_HOURS") or yahoo_payload is None:
+
+def enrich_with_yahoo_extended_hours(
+    quote: MarketQuote, yahoo_payload: dict[str, Any] | None
+) -> MarketQuote:
+    if (
+        quote.has_extended_hours_activity
+        or quote.market_session not in ("PRE_MARKET", "AFTER_HOURS")
+        or yahoo_payload is None
+    ):
         return quote
 
     yahoo_quote = _quote_from_yahoo_payload(yahoo_payload, quote.market_session)
@@ -186,7 +232,9 @@ def enrich_with_yahoo_extended_hours(quote: MarketQuote, yahoo_payload: dict[str
             }
         )
 
-    regular_price = to_float(yahoo_quote.get("regular_price")) or quote.regular_price or quote.previous_close
+    regular_price = (
+        to_float(yahoo_quote.get("regular_price")) or quote.regular_price or quote.previous_close
+    )
 
     return quote.model_copy(
         update={
@@ -240,11 +288,7 @@ async def _fetch_yahoo_extended_quotes(
     payload = response.json()
     results = payload.get("quoteResponse", {}).get("result", [])
 
-    return {
-        str(item.get("symbol", "")).upper(): item
-        for item in results
-        if item.get("symbol")
-    }
+    return {str(item.get("symbol", "")).upper(): item for item in results if item.get("symbol")}
 
 
 async def _fetch_finnhub_candle_stats(
@@ -346,31 +390,29 @@ async def get_finnhub_quotes(symbols: list[str]) -> list[MarketQuote]:
 
     async with httpx.AsyncClient(timeout=15) as client:
         results = await asyncio.gather(
-            *[
-                _fetch_finnhub_quote(client, symbol, settings.finnhub_api_key)
-                for symbol in symbols
-            ],
+            *[_fetch_finnhub_quote(client, symbol, settings.finnhub_api_key) for symbol in symbols],
             return_exceptions=True,
         )
 
         quotes_by_symbol = {
-            result.symbol: result
-            for result in results
-            if isinstance(result, MarketQuote)
+            result.symbol: result for result in results if isinstance(result, MarketQuote)
         }
 
         market_session, _next_market_open = get_market_session()
         symbols_needing_extended_fallback = [
             symbol
             for symbol, quote in quotes_by_symbol.items()
-            if market_session in ("PRE_MARKET", "AFTER_HOURS") and not quote.has_extended_hours_activity
+            if market_session in ("PRE_MARKET", "AFTER_HOURS")
+            and not quote.has_extended_hours_activity
         ]
         symbols_needing_market_stats_fallback = [
             symbol
             for symbol, quote in quotes_by_symbol.items()
             if quote.volume is None or quote.open is None or quote.high is None or quote.low is None
         ]
-        yahoo_symbols = sorted(set(symbols_needing_extended_fallback + symbols_needing_market_stats_fallback))
+        yahoo_symbols = sorted(
+            set(symbols_needing_extended_fallback + symbols_needing_market_stats_fallback)
+        )
         yahoo_quotes: dict[str, dict[str, Any]] = {}
         if yahoo_symbols:
             try:
@@ -381,7 +423,9 @@ async def get_finnhub_quotes(symbols: list[str]) -> list[MarketQuote]:
         for symbol in yahoo_symbols:
             quote = quotes_by_symbol.get(symbol)
             if quote is not None:
-                quotes_by_symbol[symbol] = enrich_with_yahoo_market_stats(quote, yahoo_quotes.get(symbol))
+                quotes_by_symbol[symbol] = enrich_with_yahoo_market_stats(
+                    quote, yahoo_quotes.get(symbol)
+                )
 
         symbols_needing_yfinance_fallback = [
             symbol
@@ -393,13 +437,15 @@ async def get_finnhub_quotes(symbols: list[str]) -> list[MarketQuote]:
             for symbol in symbols_needing_yfinance_fallback:
                 quote = quotes_by_symbol.get(symbol)
                 if quote is not None:
-                    quotes_by_symbol[symbol] = enrich_with_yfinance_market_stats(quote, yfinance_stats.get(symbol))
+                    quotes_by_symbol[symbol] = enrich_with_yfinance_market_stats(
+                        quote, yfinance_stats.get(symbol)
+                    )
 
         for symbol in symbols_needing_extended_fallback:
             quote = quotes_by_symbol.get(symbol)
             if quote is not None:
-                quotes_by_symbol[symbol] = enrich_with_yahoo_extended_hours(quote, yahoo_quotes.get(symbol))
+                quotes_by_symbol[symbol] = enrich_with_yahoo_extended_hours(
+                    quote, yahoo_quotes.get(symbol)
+                )
 
     return [quotes_by_symbol[symbol] for symbol in symbols if symbol in quotes_by_symbol]
-
-

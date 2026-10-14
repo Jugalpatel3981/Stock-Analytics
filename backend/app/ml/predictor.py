@@ -14,7 +14,9 @@ from app.services import stock_service
 from app.services.stock_service import normalize_ticker
 
 
-def _expected_range(predicted_close: float, latest_close: float, metrics: dict[str, float]) -> tuple[float, float]:
+def _expected_range(
+    predicted_close: float, latest_close: float, metrics: dict[str, float]
+) -> tuple[float, float]:
     mae = metrics.get("mae")
     mape = metrics.get("mape")
     if mae is None and mape is None:
@@ -39,7 +41,11 @@ async def get_stock_prediction(session: AsyncSession, ticker: str) -> StockPredi
     if model_record is None or not registry.model_artifact_exists(model_record):
         await stock_service.get_stock_detail(normalized_ticker)
         was_enqueued = enqueue_training_symbol(normalized_ticker)
-        queue_message = "Model training has been queued." if was_enqueued else "Model training is already queued."
+        queue_message = (
+            "Model training has been queued."
+            if was_enqueued
+            else "Model training is already queued."
+        )
         return StockPredictionResponse(
             ticker=normalized_ticker,
             status="preparing",
@@ -54,7 +60,9 @@ async def get_stock_prediction(session: AsyncSession, ticker: str) -> StockPredi
     feature_set = build_feature_set(price_rows)
     if feature_set.latest_features.empty:
         was_enqueued = enqueue_training_symbol(normalized_ticker)
-        queue_message = "Model refresh has been queued." if was_enqueued else "Model refresh is already queued."
+        queue_message = (
+            "Model refresh has been queued." if was_enqueued else "Model refresh is already queued."
+        )
         return StockPredictionResponse(
             ticker=normalized_ticker,
             status="preparing",
@@ -92,8 +100,16 @@ async def build_prediction_context(session: AsyncSession, ticker: str) -> str:
 
     price_rows = await load_price_history(session, normalized_ticker)
     indicators = explain_latest_indicators(price_rows)
-    indicator_lines = "\n".join(f"- {item}" for item in indicators) if indicators else "- No strong indicator explanation available."
-    if prediction.status == "preparing" or prediction.predicted_close is None or prediction.latest_close is None:
+    indicator_lines = (
+        "\n".join(f"- {item}" for item in indicators)
+        if indicators
+        else "- No strong indicator explanation available."
+    )
+    if (
+        prediction.status == "preparing"
+        or prediction.predicted_close is None
+        or prediction.latest_close is None
+    ):
         return prediction.message or f"Prediction model for {normalized_ticker} is being prepared."
 
     direction = "higher" if prediction.predicted_close > prediction.latest_close else "lower"
@@ -110,6 +126,3 @@ async def build_prediction_context(session: AsyncSession, ticker: str) -> str:
             "Use these indicators only as evidence. Do not fabricate additional model reasoning.",
         ]
     )
-
-
-

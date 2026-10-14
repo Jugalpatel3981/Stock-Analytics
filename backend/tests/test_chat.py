@@ -111,6 +111,7 @@ def test_delete_chat_session(monkeypatch) -> None:
 
     assert response.status_code == 204
 
+
 def test_create_chat_message(monkeypatch) -> None:
     async def fake_create_message_exchange(
         session,

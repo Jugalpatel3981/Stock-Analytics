@@ -45,12 +45,12 @@ def _to_records_frame(price_rows: list[Any]) -> pd.DataFrame:
         records.append(
             {
                 "price_date": getattr(row, "price_date", None),
-                "open": float(getattr(row, "open")),
-                "high": float(getattr(row, "high")),
-                "low": float(getattr(row, "low")),
-                "close": float(getattr(row, "close")),
-                "adjusted_close": float(getattr(row, "adjusted_close")),
-                "volume": float(getattr(row, "volume") or 0),
+                "open": float(row.open),
+                "high": float(row.high),
+                "low": float(row.low),
+                "close": float(row.close),
+                "adjusted_close": float(row.adjusted_close),
+                "volume": float(row.volume or 0),
             }
         )
 
@@ -116,7 +116,9 @@ def build_feature_set(price_rows: list[Any]) -> FeatureSet:
 
     supervised_frame = frame.dropna(subset=[*FEATURE_COLUMNS, TARGET_COLUMN])
     latest_features = frame.dropna(subset=FEATURE_COLUMNS).tail(1)
-    return FeatureSet(frame=frame, supervised_frame=supervised_frame, latest_features=latest_features)
+    return FeatureSet(
+        frame=frame, supervised_frame=supervised_frame, latest_features=latest_features
+    )
 
 
 def explain_latest_indicators(price_rows: list[Any]) -> list[str]:
@@ -151,4 +153,3 @@ def explain_latest_indicators(price_rows: list[Any]) -> list[str]:
         explanations.append("Recent volume is above its 20-day average")
 
     return explanations[:6]
-

@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     backend_cors_origins: str = "http://localhost:3000"
-    database_url: str = "postgresql+asyncpg://stock_user:stock_password@localhost:5432/stock_intelligence"
+    database_url: str = (
+        "postgresql+asyncpg://stock_user:stock_password@localhost:5432/stock_intelligence"
+    )
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
@@ -44,7 +46,11 @@ class Settings(BaseSettings):
 
     @property
     def default_ml_symbols(self) -> list[str]:
-        return [symbol.strip().upper() for symbol in self.ml_default_symbols.split(",") if symbol.strip()]
+        return [
+            symbol.strip().upper()
+            for symbol in self.ml_default_symbols.split(",")
+            if symbol.strip()
+        ]
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
@@ -57,4 +63,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

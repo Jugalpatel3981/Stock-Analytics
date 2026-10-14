@@ -30,7 +30,9 @@ class MLPipelineScheduler:
             self._task = asyncio.create_task(self._run_loop(), name="ml-pipeline-scheduler")
 
         if self._queue_task is None or self._queue_task.done():
-            self._queue_task = asyncio.create_task(self._run_on_demand_queue(), name="ml-on-demand-training-queue")
+            self._queue_task = asyncio.create_task(
+                self._run_on_demand_queue(), name="ml-on-demand-training-queue"
+            )
 
         logger.info("ML scheduler started.")
 
@@ -67,7 +69,9 @@ class MLPipelineScheduler:
         while not self._stop_event.is_set():
             get_task = asyncio.create_task(queue.get())
             stop_task = asyncio.create_task(self._stop_event.wait())
-            done, pending = await asyncio.wait({get_task, stop_task}, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                {get_task, stop_task}, return_when=asyncio.FIRST_COMPLETED
+            )
 
             for task in pending:
                 task.cancel()

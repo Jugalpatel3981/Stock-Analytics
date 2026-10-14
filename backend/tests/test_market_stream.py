@@ -4,7 +4,10 @@ from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token
 from app.main import app
-from app.market.rest_market_service import _stats_from_candle_payload, enrich_with_yahoo_market_stats
+from app.market.rest_market_service import (
+    _stats_from_candle_payload,
+    enrich_with_yahoo_market_stats,
+)
 from app.schemas.market import MarketQuote
 from app.services.market_stream_service import (
     _enrich_with_yahoo_extended_hours,
@@ -12,7 +15,6 @@ from app.services.market_stream_service import (
     get_market_session,
     normalize_symbols,
 )
-
 
 client = TestClient(app)
 
@@ -80,6 +82,7 @@ def test_after_hours_without_extended_activity_uses_current_price_as_regular_clo
     assert regular_price == 234.11
     assert extended_hours_price is None
 
+
 def test_yahoo_extended_hours_fallback_enriches_after_hours_quote() -> None:
     quote = MarketQuote(
         symbol="MSFT",
@@ -135,6 +138,7 @@ def test_yahoo_extended_hours_fallback_keeps_waiting_quote_without_extended_pric
     assert enriched_quote.has_extended_hours_activity is False
     assert enriched_quote.extended_hours_status == "WAITING"
 
+
 def test_market_stats_sums_intraday_volume_and_ohlc() -> None:
     stats = _stats_from_candle_payload(
         {
@@ -150,6 +154,7 @@ def test_market_stats_sums_intraday_volume_and_ohlc() -> None:
     assert stats["high"] == 104.5
     assert stats["low"] == 99.0
     assert stats["volume"] == 6500
+
 
 def test_yahoo_market_stats_fallback_fills_volume_and_day_stats() -> None:
     quote = MarketQuote(

@@ -20,11 +20,15 @@ def normalize_symbol(symbol: str) -> str:
     return symbol.strip().upper()
 
 
-def build_holding_read(holding: PortfolioHolding, current_price: float | None) -> PortfolioHoldingRead:
+def build_holding_read(
+    holding: PortfolioHolding, current_price: float | None
+) -> PortfolioHoldingRead:
     cost_basis = holding.quantity * holding.buy_price
     current_value = holding.quantity * current_price if current_price is not None else None
     gain_loss = current_value - cost_basis if current_value is not None else None
-    percentage_return = (gain_loss / cost_basis) * 100 if gain_loss is not None and cost_basis > 0 else None
+    percentage_return = (
+        (gain_loss / cost_basis) * 100 if gain_loss is not None and cost_basis > 0 else None
+    )
 
     return PortfolioHoldingRead(
         id=holding.id,

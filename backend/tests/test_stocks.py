@@ -12,8 +12,8 @@ from app.schemas.stock import (
     StockNewsItem,
     StockNewsResponse,
     StockPredictionResponse,
-    StockSentimentTrendPoint,
     StockSearchResult,
+    StockSentimentTrendPoint,
 )
 from app.services import prediction_service, stock_service
 
@@ -278,4 +278,3 @@ def test_read_stock_prediction(monkeypatch) -> None:
     assert payload["expected_price_high"] == 252.24
     assert payload["confidence_score"] == 87.4
     assert payload["data_source"] == "Production ML pipeline"
-

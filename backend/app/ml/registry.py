@@ -72,7 +72,9 @@ def model_artifact_exists(model_record: MLModel | None) -> bool:
     return model_record is not None and Path(model_record.model_path).exists()
 
 
-def should_promote_model(candidate_metrics: dict[str, float], production_record: MLModel | None) -> bool:
+def should_promote_model(
+    candidate_metrics: dict[str, float], production_record: MLModel | None
+) -> bool:
     if production_record is None or not model_artifact_exists(production_record):
         return True
 
@@ -118,5 +120,3 @@ async def register_model(
     session.add(model_record)
     await session.flush()
     return model_record
-
-

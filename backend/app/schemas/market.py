@@ -2,7 +2,6 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-
 MarketSession = Literal["PRE_MARKET", "OPEN", "AFTER_HOURS", "CLOSED"]
 ExtendedHoursStatus = Literal["ACTIVE", "WAITING", "NONE"]
 

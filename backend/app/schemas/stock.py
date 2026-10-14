@@ -82,5 +82,3 @@ class StockPredictionResponse(BaseModel):
     message: str | None = None
     prediction_horizon: str = "Next trading day close"
     data_source: str = "Production ML pipeline"
-
-

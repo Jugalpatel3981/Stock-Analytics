@@ -64,7 +64,9 @@ def test_create_watchlist(monkeypatch) -> None:
 
 
 def test_add_stock_to_watchlist(monkeypatch) -> None:
-    async def fake_add_stock_to_watchlist(session, user_id: int, watchlist_id: int, ticker: str) -> WatchlistRead:
+    async def fake_add_stock_to_watchlist(
+        session, user_id: int, watchlist_id: int, ticker: str
+    ) -> WatchlistRead:
         assert user_id == 1
         assert watchlist_id == 1
         assert ticker == "nvda"
@@ -82,14 +84,18 @@ def test_add_stock_to_watchlist(monkeypatch) -> None:
 
 
 def test_remove_stock_from_watchlist(monkeypatch) -> None:
-    async def fake_remove_stock_from_watchlist(session, user_id: int, watchlist_id: int, ticker: str) -> WatchlistRead:
+    async def fake_remove_stock_from_watchlist(
+        session, user_id: int, watchlist_id: int, ticker: str
+    ) -> WatchlistRead:
         assert user_id == 1
         assert watchlist_id == 1
         assert ticker == "NVDA"
         return build_watchlist()
 
     app.dependency_overrides[get_current_user] = override_current_user
-    monkeypatch.setattr(watchlist_service, "remove_stock_from_watchlist", fake_remove_stock_from_watchlist)
+    monkeypatch.setattr(
+        watchlist_service, "remove_stock_from_watchlist", fake_remove_stock_from_watchlist
+    )
 
     response = client.delete("/api/v1/watchlists/1/stocks/NVDA")
 

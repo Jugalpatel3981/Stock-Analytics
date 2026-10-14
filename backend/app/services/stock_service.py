@@ -6,16 +6,16 @@ import httpx
 import yfinance as yf
 from fastapi import HTTPException, status
 
+from app.core.config import get_settings
 from app.schemas.stock import (
     HistoricalPricePoint,
     StockDetail,
     StockHistoryResponse,
     StockNewsItem,
     StockNewsResponse,
-    StockSentimentTrendPoint,
     StockSearchResult,
+    StockSentimentTrendPoint,
 )
-from app.core.config import get_settings
 from app.services import sentiment_service
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
@@ -197,6 +197,7 @@ def _build_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
         ),
     }
 
+
 def _build_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
     normalized_ticker = normalize_ticker(ticker)
     history_config = HISTORY_RANGES[range_key]
@@ -269,7 +270,9 @@ def _build_stock_news_items(ticker: str, limit: int) -> list[StockNewsItem]:
                     or content.get("publisher")
                     or article.get("publisher")
                 ),
-                publish_date=_to_publish_date(content.get("pubDate") or article.get("providerPublishTime")),
+                publish_date=_to_publish_date(
+                    content.get("pubDate") or article.get("providerPublishTime")
+                ),
                 summary=content.get("summary") or article.get("summary"),
                 url=_extract_news_url(content, article),
             )
@@ -309,7 +312,9 @@ def _build_sentiment_trend(articles: list[StockNewsItem]) -> list[StockSentiment
             positive=int(values["Positive"]),
             neutral=int(values["Neutral"]),
             negative=int(values["Negative"]),
-            average_score=round(values["score_total"] / values["count"], 4) if values["count"] else 0.0,
+            average_score=round(values["score_total"] / values["count"], 4)
+            if values["count"]
+            else 0.0,
         )
         for day, values in sorted(grouped.items())
     ]
@@ -418,5 +423,3 @@ async def search_stocks(query: str) -> list[StockSearchResult]:
 
 async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:
     return await search_stocks(query)
-
-

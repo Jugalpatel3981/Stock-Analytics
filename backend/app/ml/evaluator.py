@@ -18,7 +18,9 @@ class EvaluationMetrics:
         return max(0.0, min(100.0, (1 - self.mape) * 100))
 
 
-def evaluate_predictions(frame: pd.DataFrame, actuals: np.ndarray, predictions: np.ndarray) -> EvaluationMetrics:
+def evaluate_predictions(
+    frame: pd.DataFrame, actuals: np.ndarray, predictions: np.ndarray
+) -> EvaluationMetrics:
     errors = actuals - predictions
     mae = float(np.mean(np.abs(errors)))
     rmse = float(np.sqrt(np.mean(np.square(errors))))

@@ -33,7 +33,9 @@ def _fit_xgboost_candidate(price_rows: list[object], min_training_rows: int) -> 
     supervised_frame = feature_set.supervised_frame
 
     if len(supervised_frame) < min_training_rows:
-        raise ValueError(f"At least {min_training_rows} usable daily price rows are required for model training.")
+        raise ValueError(
+            f"At least {min_training_rows} usable daily price rows are required for model training."
+        )
 
     split_index = int(len(supervised_frame) * 0.8)
     train_frame = supervised_frame.iloc[:split_index]
@@ -75,7 +77,9 @@ def _fit_xgboost_candidate(price_rows: list[object], min_training_rows: int) -> 
     )
 
 
-async def train_model_for_ticker(session: AsyncSession, ticker: str, *, refresh_data: bool = True) -> MLTrainingRun:
+async def train_model_for_ticker(
+    session: AsyncSession, ticker: str, *, refresh_data: bool = True
+) -> MLTrainingRun:
     settings = get_settings()
     normalized_ticker = normalize_ticker(ticker)
     started_at = datetime.now(UTC)
@@ -95,7 +99,9 @@ async def train_model_for_ticker(session: AsyncSession, ticker: str, *, refresh_
             await update_historical_data(session, normalized_ticker)
 
         price_rows = await load_price_history(session, normalized_ticker)
-        candidate = await asyncio.to_thread(_fit_xgboost_candidate, price_rows, settings.ml_min_training_rows)
+        candidate = await asyncio.to_thread(
+            _fit_xgboost_candidate, price_rows, settings.ml_min_training_rows
+        )
         version = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
         model_path = await registry.save_model_artifact(normalized_ticker, version, candidate.model)
 

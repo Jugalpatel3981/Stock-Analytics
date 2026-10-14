@@ -30,7 +30,9 @@ class WatchlistStock(Base):
     __table_args__ = (UniqueConstraint("watchlist_id", "ticker", name="uq_watchlist_stock_ticker"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
-    watchlist_id: Mapped[int] = mapped_column(ForeignKey("watchlists.id", ondelete="CASCADE"), index=True)
+    watchlist_id: Mapped[int] = mapped_column(
+        ForeignKey("watchlists.id", ondelete="CASCADE"), index=True
+    )
     ticker: Mapped[str] = mapped_column(String(12), nullable=False)
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

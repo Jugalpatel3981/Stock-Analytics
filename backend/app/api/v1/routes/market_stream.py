@@ -6,7 +6,11 @@ from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.schemas.market import MarketQuote
-from app.services.market_stream_service import get_finnhub_quotes, normalize_symbols, stream_finnhub_trades
+from app.services.market_stream_service import (
+    get_finnhub_quotes,
+    normalize_symbols,
+    stream_finnhub_trades,
+)
 
 router = APIRouter()
 

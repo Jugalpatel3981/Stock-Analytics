@@ -83,5 +83,3 @@ def test_training_queue_deduplicates_symbols() -> None:
 
     training_queue.mark_training_symbol_complete("AMD")
     assert training_queue.is_training_symbol_queued("AMD") is False
-
-

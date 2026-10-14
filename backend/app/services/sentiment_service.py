@@ -62,12 +62,18 @@ async def analyze_sentiment(text: str) -> SentimentResult:
         return _fallback_result()
 
     payload = response.json()
-    predictions = payload[0] if isinstance(payload, list) and payload and isinstance(payload[0], list) else payload
+    predictions = (
+        payload[0]
+        if isinstance(payload, list) and payload and isinstance(payload[0], list)
+        else payload
+    )
 
     if not isinstance(predictions, list) or not predictions:
         return _fallback_result()
 
-    top_prediction = max(predictions, key=lambda item: float(item.get("score", 0)) if isinstance(item, dict) else 0)
+    top_prediction = max(
+        predictions, key=lambda item: float(item.get("score", 0)) if isinstance(item, dict) else 0
+    )
 
     if not isinstance(top_prediction, dict):
         return _fallback_result()
