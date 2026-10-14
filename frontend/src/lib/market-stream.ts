@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { getMarketQuotes, type MarketSession } from "@/lib/api";
+import { getMarketQuotes, getMarketStreamToken, type MarketSession } from "@/lib/api";
 import { getMarketStreamUrl } from "@/lib/env";
 
 export type LiveQuote = {
@@ -122,7 +122,8 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
     const url = new URL(getMarketStreamUrl());
     url.searchParams.set("symbols", symbolKey);
 
-    const socket = new WebSocket(url.toString());
+    let socket: WebSocket | null = null;
+    let isActive = true;
     const initialPrices = JSON.parse(initialPricesKey) as Record<string, number | null>;
     const requestedSymbols = symbolKey.split(",");
 
@@ -149,91 +150,114 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
       setNextMarketOpen(newestRememberedQuote.nextMarketOpen);
     }
 
-    socket.onopen = () => {
-      setStatus("connected");
-    };
-
-    socket.onmessage = (event) => {
-      const payload = JSON.parse(event.data) as {
-        type: string;
-        symbol?: string;
-        price?: number;
-        timestamp?: string;
-        message?: string;
+    function attachHandlers(activeSocket: WebSocket) {
+      activeSocket.onopen = () => {
+        setStatus("connected");
       };
 
-      if (payload.type === "error") {
+      activeSocket.onmessage = (event) => {
+        const payload = JSON.parse(event.data) as {
+          type: string;
+          symbol?: string;
+          price?: number;
+          timestamp?: string;
+          message?: string;
+        };
+
+        if (payload.type === "error") {
+          setStatus("error");
+          setError(payload.message ?? "Live stream unavailable");
+          return;
+        }
+
+        if (payload.type !== "trade" || !payload.symbol || typeof payload.price !== "number") {
+          return;
+        }
+
+        const symbol = payload.symbol.toUpperCase();
+        const price = payload.price;
+        const timestamp = payload.timestamp ?? new Date().toISOString();
+
+        setQuotes((currentQuotes) => {
+          const previous = currentQuotes[symbol] ?? liveQuoteMemory[symbol];
+          const initialPrice = initialPrices[symbol] ?? previous?.price ?? null;
+          const previousPrice = previous?.price ?? null;
+          const previousClose = previous?.previousClose ?? null;
+          const regularPrice = previous?.regularPrice ?? null;
+          const extendedHoursPrice = previous?.extendedHoursPrice ?? null;
+          const extendedHoursSource = previous?.extendedHoursSource ?? null;
+          const hasTradeExtendedHoursActivity =
+            previous?.marketSession === "PRE_MARKET" || previous?.marketSession === "AFTER_HOURS";
+          const hasExtendedActivity = previous?.hasExtendedHoursActivity || hasTradeExtendedHoursActivity;
+          const quoteMarketSession = previous?.marketSession ?? "CLOSED";
+          const quoteNextMarketOpen = previous?.nextMarketOpen ?? null;
+          const changeBase = previousClose ?? initialPrice ?? previousPrice;
+          const change = changeBase !== null ? price - changeBase : null;
+          const changePercent = changeBase ? ((change ?? 0) / changeBase) * 100 : null;
+          const nextQuote: LiveQuote = {
+            symbol,
+            price,
+            timestamp,
+            previousPrice,
+            previousClose,
+            regularPrice,
+            extendedHoursPrice: hasExtendedActivity ? price : extendedHoursPrice,
+            hasExtendedHoursActivity: hasExtendedActivity,
+            extendedHoursStatus: hasExtendedActivity ? "ACTIVE" : previous?.extendedHoursStatus ?? "NONE",
+            extendedHoursSource: hasTradeExtendedHoursActivity ? "Finnhub" : extendedHoursSource,
+            marketSession: quoteMarketSession,
+            nextMarketOpen: quoteNextMarketOpen,
+            change,
+            changePercent,
+            todayVolume: previous?.todayVolume ?? null,
+            dayHigh: previous?.dayHigh ?? null,
+            dayLow: previous?.dayLow ?? null,
+            openPrice: previous?.openPrice ?? null,
+          };
+
+          rememberQuote(nextQuote);
+
+          return {
+            ...currentQuotes,
+            [symbol]: nextQuote,
+          };
+        });
+        setLastUpdated(timestamp);
+      };
+
+      activeSocket.onerror = () => {
         setStatus("error");
-        setError(payload.message ?? "Live stream unavailable");
+        // Keep a more specific message the server already sent before closing.
+        setError((currentError) => currentError ?? "Live stream connection failed");
+      };
+
+      activeSocket.onclose = () => {
+        setStatus((currentStatus) => (currentStatus === "error" ? currentStatus : "idle"));
+      };
+    }
+
+    async function connect() {
+      try {
+        // A short-lived token lets the browser authenticate to a backend on another domain.
+        const { token } = await getMarketStreamToken();
+        url.searchParams.set("token", token);
+      } catch {
+        // Fall back to the auth cookie, which works when both apps share a host.
+      }
+
+      if (!isActive) {
         return;
       }
 
-      if (payload.type !== "trade" || !payload.symbol || typeof payload.price !== "number") {
-        return;
-      }
+      socket = new WebSocket(url.toString());
+      attachHandlers(socket);
+    }
 
-      const symbol = payload.symbol.toUpperCase();
-      const price = payload.price;
-      const timestamp = payload.timestamp ?? new Date().toISOString();
-
-      setQuotes((currentQuotes) => {
-        const previous = currentQuotes[symbol] ?? liveQuoteMemory[symbol];
-        const initialPrice = initialPrices[symbol] ?? previous?.price ?? null;
-        const previousPrice = previous?.price ?? null;
-        const previousClose = previous?.previousClose ?? null;
-        const regularPrice = previous?.regularPrice ?? null;
-        const extendedHoursPrice = previous?.extendedHoursPrice ?? null;
-        const extendedHoursSource = previous?.extendedHoursSource ?? null;
-        const hasTradeExtendedHoursActivity =
-          previous?.marketSession === "PRE_MARKET" || previous?.marketSession === "AFTER_HOURS";
-        const hasExtendedActivity = previous?.hasExtendedHoursActivity || hasTradeExtendedHoursActivity;
-        const quoteMarketSession = previous?.marketSession ?? "CLOSED";
-        const quoteNextMarketOpen = previous?.nextMarketOpen ?? null;
-        const changeBase = previousClose ?? initialPrice ?? previousPrice;
-        const change = changeBase !== null ? price - changeBase : null;
-        const changePercent = changeBase ? ((change ?? 0) / changeBase) * 100 : null;
-        const nextQuote: LiveQuote = {
-          symbol,
-          price,
-          timestamp,
-          previousPrice,
-          previousClose,
-          regularPrice,
-          extendedHoursPrice: hasExtendedActivity ? price : extendedHoursPrice,
-          hasExtendedHoursActivity: hasExtendedActivity,
-          extendedHoursStatus: hasExtendedActivity ? "ACTIVE" : previous?.extendedHoursStatus ?? "NONE",
-          extendedHoursSource: hasTradeExtendedHoursActivity ? "Finnhub" : extendedHoursSource,
-          marketSession: quoteMarketSession,
-          nextMarketOpen: quoteNextMarketOpen,
-          change,
-          changePercent,
-          todayVolume: previous?.todayVolume ?? null,
-          dayHigh: previous?.dayHigh ?? null,
-          dayLow: previous?.dayLow ?? null,
-          openPrice: previous?.openPrice ?? null,
-        };
-
-        rememberQuote(nextQuote);
-
-        return {
-          ...currentQuotes,
-          [symbol]: nextQuote,
-        };
-      });
-      setLastUpdated(timestamp);
-    };
-
-    socket.onerror = () => {
-      setStatus("error");
-      setError("Live stream connection failed");
-    };
-
-    socket.onclose = () => {
-      setStatus((currentStatus) => (currentStatus === "error" ? currentStatus : "idle"));
-    };
+    void connect();
 
     return () => {
-      socket.close();
+      isActive = false;
+      socket?.close();
     };
   }, [initialPricesKey, symbolKey]);
 

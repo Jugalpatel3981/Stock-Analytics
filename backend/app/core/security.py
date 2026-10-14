@@ -24,6 +24,24 @@ def create_access_token(subject: str) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
+STREAM_TOKEN_SCOPE = "market_stream"
+STREAM_TOKEN_TTL_SECONDS = 120
+
+
+def create_stream_token(subject: str) -> str:
+    """Short-lived token that only authorizes opening the market WebSocket.
+
+    Browsers cannot send the auth cookie to a backend on a different domain, so the
+    frontend fetches this token through its same-origin API proxy and passes it in
+    the WebSocket URL instead.
+    """
+    settings = get_settings()
+    expires_at = datetime.now(UTC) + timedelta(seconds=STREAM_TOKEN_TTL_SECONDS)
+    payload = {"sub": subject, "exp": expires_at, "scope": STREAM_TOKEN_SCOPE}
+
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
 def decode_access_token(token: str) -> dict[str, object]:
     settings = get_settings()
     return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])

@@ -1,6 +1,7 @@
 ﻿# Environment Variables
 
-This document lists the main environment variables needed for local development and future deployment.
+This document lists the environment variables for local development and deployment. See
+[deployment.md](deployment.md) for the hosted setup.
 
 ## Root Docker Compose Variables
 
@@ -38,13 +39,29 @@ TAVILY_API_KEY=
 TAVILY_SEARCH_DEPTH=basic
 ```
 
+## ML Pipeline Variables
+
+```text
+ML_SCHEDULER_ENABLED=true
+ML_RETRAIN_INTERVAL_DAYS=4
+ML_SCHEDULER_INITIAL_DELAY_SECONDS=30
+ML_DEFAULT_SYMBOLS=AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM
+ML_MIN_TRAINING_ROWS=120
+```
+
 ## Frontend Variables
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
-API_INTERNAL_BASE_URL=http://localhost:8000/api/v1
+BACKEND_URL=http://localhost:8000
 NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
 ```
+
+`BACKEND_URL` is the backend's origin. Browser requests to `/api/v1/*` are rewritten to it by
+`next.config.ts`, and server components call it directly. It is read at **build** time for
+the rewrite, so set it before building.
+
+`NEXT_PUBLIC_MARKET_STREAM_URL` is the backend's WebSocket URL. The browser connects to it
+directly, authenticated with a short-lived token from `GET /api/v1/market/stream-token`.
 
 ## Integration Notes
 
@@ -52,7 +69,7 @@ NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
 
 `GROQ_API_KEY` enables Groq for the AI assistant and for news sentiment. Without it, every article is labelled Neutral. If both `GROQ_API_KEY` and `OPENAI_API_KEY` are set, the backend prefers Groq.
 
-`TAVILY_API_KEY` enables AI Assistant V2 web research and source citations. Without it, the assistant still uses existing platform stock, news, and sentiment context.
+`TAVILY_API_KEY` enables assistant web research and source citations. Without it, the assistant still uses existing platform stock, news, and sentiment context.
 
 `DEMO_MODE_ENABLED` turns the one-click demo login on or off.
 
@@ -61,12 +78,17 @@ NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
 Use these production settings:
 
 ```text
+# Backend
 APP_ENV=production
 AUTH_COOKIE_SECURE=true
+JWT_SECRET_KEY=<at least 32 random characters>
 BACKEND_CORS_ORIGINS=https://your-frontend-domain.com
-NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain.com/api/v1
-API_INTERNAL_BASE_URL=https://your-backend-domain.com/api/v1
+
+# Frontend
+BACKEND_URL=https://your-backend-domain.com
+NEXT_PUBLIC_MARKET_STREAM_URL=wss://your-backend-domain.com/api/v1/market/stream
 ```
 
-Generate a strong `JWT_SECRET_KEY` before deployment. Never commit real secret values.
+In production the backend refuses to start with a placeholder `JWT_SECRET_KEY` or with
+`AUTH_COOKIE_SECURE=false`. Never commit real secret values.
 

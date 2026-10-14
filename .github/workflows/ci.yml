@@ -102,7 +102,7 @@ jobs:
       - name: Build
         run: npm run build:frontend
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+          BACKEND_URL: http://localhost:8000
           NEXT_TELEMETRY_DISABLED: "1"
 
   docker:
@@ -116,4 +116,4 @@ jobs:
         run: docker build -t ai-stock-backend:ci ./backend
 
       - name: Build frontend image
-        run: docker build --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1 -t ai-stock-frontend:ci ./frontend
+        run: docker build --build-arg BACKEND_URL=http://localhost:8000 -t ai-stock-frontend:ci ./frontend

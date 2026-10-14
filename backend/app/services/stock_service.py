@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,6 +19,8 @@ from app.schemas.stock import (
     StockSentimentTrendPoint,
 )
 from app.services import sentiment_service
+
+logger = logging.getLogger(__name__)
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 
@@ -328,22 +332,36 @@ def _build_sentiment_trend(articles: list[StockNewsItem]) -> list[StockSentiment
     ]
 
 
+async def _from_yahoo[T](func: Callable[..., T], *args: Any) -> T:
+    """Run a blocking yfinance call, turning network or parsing failures into a clean 502."""
+    try:
+        return await asyncio.to_thread(func, *args)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Yahoo Finance request failed in %s: %s", func.__name__, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The market data provider is unavailable right now. Please try again shortly.",
+        ) from exc
+
+
 async def get_stock_detail(ticker: str) -> StockDetail:
     return await _detail_cache.get_or_set(
-        normalize_ticker(ticker), lambda: asyncio.to_thread(_build_stock_detail, ticker)
+        normalize_ticker(ticker), lambda: _from_yahoo(_build_stock_detail, ticker)
     )
 
 
 async def get_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
     return await _market_stats_cache.get_or_set(
-        normalize_ticker(ticker), lambda: asyncio.to_thread(_build_stock_market_stats, ticker)
+        normalize_ticker(ticker), lambda: _from_yahoo(_build_stock_market_stats, ticker)
     )
 
 
 async def get_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
     return await _history_cache.get_or_set(
         (normalize_ticker(ticker), range_key),
-        lambda: asyncio.to_thread(_build_stock_history, ticker, range_key),
+        lambda: _from_yahoo(_build_stock_history, ticker, range_key),
         INTRADAY_HISTORY_TTL_SECONDS if range_key == "1d" else None,
     )
 
@@ -356,7 +374,7 @@ async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
 
 
 async def _load_stock_news(normalized_ticker: str, limit: int) -> StockNewsResponse:
-    articles = await asyncio.to_thread(_build_stock_news_items, normalized_ticker, limit)
+    articles = await _from_yahoo(_build_stock_news_items, normalized_ticker, limit)
 
     sentiments = await sentiment_service.analyze_sentiments(
         [_build_sentiment_input(article) for article in articles]
@@ -442,7 +460,7 @@ def _search_stocks(query: str) -> list[StockSearchResult]:
 
 async def search_stocks(query: str) -> list[StockSearchResult]:
     return await _search_cache.get_or_set(
-        query.strip().lower(), lambda: asyncio.to_thread(_search_stocks, query)
+        query.strip().lower(), lambda: _from_yahoo(_search_stocks, query)
     )
 
 

@@ -292,3 +292,29 @@ def test_read_stock_prediction(monkeypatch) -> None:
     assert payload["backtest"]["baseline_mae"] == 4.2
     assert "confidence_score" not in payload
     assert payload["data_source"] == "Production ML pipeline"
+
+
+async def test_yahoo_failures_become_bad_gateway(monkeypatch) -> None:
+    import pytest
+    from fastapi import HTTPException
+
+    def unreachable(_ticker: str):
+        raise ConnectionError("tunnel failed")
+
+    monkeypatch.setattr(stock_service, "_build_stock_detail", unreachable)
+
+    with pytest.raises(HTTPException) as caught:
+        await stock_service.get_stock_detail("NVDA")
+
+    assert caught.value.status_code == 502
+
+
+async def test_portfolio_price_is_none_when_provider_is_down(monkeypatch) -> None:
+    from app.services import portfolio_service
+
+    def unreachable(_ticker: str):
+        raise ConnectionError("tunnel failed")
+
+    monkeypatch.setattr(stock_service, "_build_stock_detail", unreachable)
+
+    assert await portfolio_service.get_current_price("NVDA") is None

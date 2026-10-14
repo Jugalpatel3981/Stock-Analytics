@@ -199,6 +199,7 @@ export type PortfolioSummary = {
   total_cost: number;
   total_gain_loss: number;
   total_percentage_return: number;
+  unpriced_holdings: number;
   holdings: PortfolioHolding[];
 };
 
@@ -247,6 +248,10 @@ export function loginUser(input: { email: string; password: string }) {
     method: "POST",
     body: input,
   });
+}
+
+export function getMarketStreamToken() {
+  return apiRequest<{ token: string; expires_in: number }>("/market/stream-token");
 }
 
 export function demoLogin() {

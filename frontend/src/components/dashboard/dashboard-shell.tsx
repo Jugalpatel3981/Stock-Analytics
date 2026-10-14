@@ -75,7 +75,7 @@ export function DashboardShell({ userName, activeItem = "Dashboard", children }:
             <div className="flex min-h-16 flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
               <div>
                 <p className="text-xs font-medium uppercase text-muted-foreground">Market command center</p>
-                <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">Dashboard</h1>
+                <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">{activeItem}</h1>
               </div>
               <div className="flex items-center gap-2">
                 <DashboardHeaderActions />

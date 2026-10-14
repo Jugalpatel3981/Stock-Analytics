@@ -47,8 +47,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const showToast = useCallback(
     ({ title, message, variant = "error", duration = 4500 }: ToastInput) => {
       const id = Date.now() + Math.random();
-      setToasts((current) => [...current, { id, title, message, variant }]);
-      window.setTimeout(() => dismissToast(id), duration);
+      let added = false;
+      setToasts((current) => {
+        // Several widgets can report the same failure at once; show it only once.
+        if (current.some((toast) => toast.title === title && toast.message === message)) {
+          return current;
+        }
+        added = true;
+        return [...current, { id, title, message, variant }];
+      });
+      window.setTimeout(() => {
+        if (added) {
+          dismissToast(id);
+        }
+      }, duration);
     },
     [dismissToast],
   );

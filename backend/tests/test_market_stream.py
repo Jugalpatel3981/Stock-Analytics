@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi.testclient import TestClient
 
-from app.core.security import create_access_token
+from app.core.security import create_access_token, create_stream_token
 from app.main import app
 from app.market.rest_market_service import (
     _stats_from_candle_payload,
@@ -48,6 +48,36 @@ def test_market_stream_requires_symbols_after_authentication() -> None:
 
     assert payload["type"] == "error"
     assert payload["message"] == "At least one symbol is required."
+
+
+def test_market_stream_accepts_stream_token_in_url() -> None:
+    token = create_stream_token(subject="123")
+
+    with client.websocket_connect(f"/api/v1/market/stream?symbols=&token={token}") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["message"] == "At least one symbol is required."
+
+
+def test_market_stream_rejects_regular_access_token_in_url() -> None:
+    token = create_access_token(subject="123")
+
+    with client.websocket_connect(f"/api/v1/market/stream?symbols=NVDA&token={token}") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["message"] == "Invalid stream token."
+
+
+def test_stream_token_cannot_be_used_for_api_requests() -> None:
+    token = create_stream_token(subject="123")
+
+    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
+def test_stream_token_endpoint_requires_authentication() -> None:
+    assert client.get("/api/v1/market/stream-token").status_code == 401
 
 
 def test_market_session_detects_regular_market_open() -> None:

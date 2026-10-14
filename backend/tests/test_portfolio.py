@@ -121,3 +121,46 @@ def test_portfolio_growth(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["points"][1]["value"] == 210
+
+
+async def test_summary_excludes_holdings_without_a_price(monkeypatch) -> None:
+    from datetime import date
+
+    from app.models.portfolio import PortfolioHolding
+
+    holdings = [
+        PortfolioHolding(
+            id=1,
+            user_id=1,
+            symbol="AAPL",
+            quantity=2,
+            buy_price=100.0,
+            buy_date=date(2025, 1, 2),
+            created_at=datetime.now(UTC),
+        ),
+        PortfolioHolding(
+            id=2,
+            user_id=1,
+            symbol="NVDA",
+            quantity=5,
+            buy_price=50.0,
+            buy_date=date(2025, 1, 2),
+            created_at=datetime.now(UTC),
+        ),
+    ]
+
+    async def fake_list_raw_holdings(_session, _user_id):
+        return holdings
+
+    async def fake_get_current_price(symbol: str):
+        return 150.0 if symbol == "AAPL" else None
+
+    monkeypatch.setattr(portfolio_service, "list_raw_holdings", fake_list_raw_holdings)
+    monkeypatch.setattr(portfolio_service, "get_current_price", fake_get_current_price)
+
+    summary = await portfolio_service.get_portfolio_summary(None, 1)  # type: ignore[arg-type]
+
+    assert summary.total_value == 300.0
+    assert summary.total_cost == 200.0
+    assert summary.total_gain_loss == 100.0
+    assert summary.unpriced_holdings == 1

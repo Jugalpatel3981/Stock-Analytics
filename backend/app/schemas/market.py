@@ -26,3 +26,8 @@ class MarketQuote(BaseModel):
     market_timezone: str = "America/New_York"
     timestamp: str
     source: str = "Finnhub"
+
+
+class StreamTokenResponse(BaseModel):
+    token: str
+    expires_in: int
