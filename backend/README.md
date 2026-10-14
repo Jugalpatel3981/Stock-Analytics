@@ -7,9 +7,11 @@ FastAPI service for the AI Stock Intelligence Platform.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 pytest
+ruff check .
+python -m app.ml.backtest --symbols AAPL MSFT   # model backtest report
 ```
 
 ## Environment
@@ -28,6 +30,7 @@ python -m app.scripts.init_db
 
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/demo`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
 - `GET /api/v1/auth/protected`

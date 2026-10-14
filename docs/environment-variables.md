@@ -29,6 +29,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 AUTH_COOKIE_NAME=access_token
 AUTH_COOKIE_SECURE=false
 AUTO_CREATE_TABLES=true
+DEMO_MODE_ENABLED=true
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 GROQ_API_KEY=
@@ -50,9 +51,11 @@ NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
 
 `FINNHUB_API_KEY` enables real-time WebSocket market streaming. Without it, live widgets show a clear configuration error instead of fake prices.
 
-`GROQ_API_KEY` enables Groq as the assistant model provider. If both `GROQ_API_KEY` and `OPENAI_API_KEY` are set, the backend prefers Groq.
+`GROQ_API_KEY` enables Groq for the AI assistant and for news sentiment. Without it, every article is labelled Neutral. If both `GROQ_API_KEY` and `OPENAI_API_KEY` are set, the backend prefers Groq.
 
 `TAVILY_API_KEY` enables AI Assistant V2 web research and source citations. Without it, the assistant still uses existing platform stock, news, and sentiment context.
+
+`DEMO_MODE_ENABLED` turns the one-click demo login on or off.
 
 ## Production Notes
 
