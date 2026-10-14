@@ -1,6 +1,7 @@
 import json
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +34,23 @@ class Settings(BaseSettings):
     ml_models_dir: str = "models"
     ml_default_symbols: str = "AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM"
     ml_min_training_rows: int = 120
+
+    @model_validator(mode="after")
+    def _require_production_secrets(self) -> "Settings":
+        if self.app_env != "production":
+            return self
+
+        if len(self.jwt_secret_key) < 32 or self.jwt_secret_key.startswith(
+            ("change-me", "replace-with")
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a random value of at least 32 characters."
+            )
+
+        if not self.auth_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SECURE must be true in production.")
+
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

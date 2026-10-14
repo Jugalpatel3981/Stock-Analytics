@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend Tests
+    name: Backend Lint & Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,13 +25,19 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
 
       - name: Run tests
         run: pytest
 
   frontend:
-    name: Frontend Lint
+    name: Frontend Lint, Type-check & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,6 +55,15 @@ jobs:
 
       - name: Run lint
         run: npm run lint:frontend
+
+      - name: Type-check
+        run: npm run typecheck:frontend
+
+      - name: Build
+        run: npm run build:frontend
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+          NEXT_TELEMETRY_DISABLED: "1"
 
   docker:
     name: Docker Build Check
