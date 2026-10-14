@@ -66,3 +66,17 @@ def test_demo_login_can_be_disabled(monkeypatch) -> None:
     response = client.post("/api/v1/auth/demo")
 
     assert response.status_code == 404
+
+
+def test_login_is_rate_limited() -> None:
+    from app.core.rate_limit import login_rate_limit
+
+    for _ in range(login_rate_limit.max_requests):
+        login_rate_limit.check("testclient")
+
+    response = client.post(
+        "/api/v1/auth/login", json={"email": "someone@example.com", "password": "password123"}
+    )
+
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) >= 1

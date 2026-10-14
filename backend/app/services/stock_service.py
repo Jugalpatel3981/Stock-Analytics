@@ -6,6 +6,7 @@ import httpx
 import yfinance as yf
 from fastapi import HTTPException, status
 
+from app.core.cache import TTLCache
 from app.schemas.stock import (
     HistoricalPricePoint,
     StockDetail,
@@ -36,6 +37,14 @@ COMPANY_SYMBOL_ALIASES = {
     "nvidia": "NVDA",
     "tesla": "TSLA",
 }
+
+# Yahoo Finance is slow and rate-limits aggressively, especially from cloud servers.
+_detail_cache = TTLCache(ttl_seconds=60)
+_market_stats_cache = TTLCache(ttl_seconds=30)
+_history_cache = TTLCache(ttl_seconds=15 * 60)
+_news_cache = TTLCache(ttl_seconds=10 * 60)
+_search_cache = TTLCache(ttl_seconds=60 * 60)
+INTRADAY_HISTORY_TTL_SECONDS = 60
 
 HISTORY_RANGES = {
     "1d": {"period": "1d", "interval": "5m"},
@@ -320,19 +329,33 @@ def _build_sentiment_trend(articles: list[StockNewsItem]) -> list[StockSentiment
 
 
 async def get_stock_detail(ticker: str) -> StockDetail:
-    return await asyncio.to_thread(_build_stock_detail, ticker)
+    return await _detail_cache.get_or_set(
+        normalize_ticker(ticker), lambda: asyncio.to_thread(_build_stock_detail, ticker)
+    )
 
 
 async def get_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
-    return await asyncio.to_thread(_build_stock_market_stats, ticker)
+    return await _market_stats_cache.get_or_set(
+        normalize_ticker(ticker), lambda: asyncio.to_thread(_build_stock_market_stats, ticker)
+    )
 
 
 async def get_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
-    return await asyncio.to_thread(_build_stock_history, ticker, range_key)
+    return await _history_cache.get_or_set(
+        (normalize_ticker(ticker), range_key),
+        lambda: asyncio.to_thread(_build_stock_history, ticker, range_key),
+        INTRADAY_HISTORY_TTL_SECONDS if range_key == "1d" else None,
+    )
 
 
 async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
     normalized_ticker = normalize_ticker(ticker)
+    return await _news_cache.get_or_set(
+        (normalized_ticker, limit), lambda: _load_stock_news(normalized_ticker, limit)
+    )
+
+
+async def _load_stock_news(normalized_ticker: str, limit: int) -> StockNewsResponse:
     articles = await asyncio.to_thread(_build_stock_news_items, normalized_ticker, limit)
 
     sentiments = await sentiment_service.analyze_sentiments(
@@ -418,7 +441,9 @@ def _search_stocks(query: str) -> list[StockSearchResult]:
 
 
 async def search_stocks(query: str) -> list[StockSearchResult]:
-    return await asyncio.to_thread(_search_stocks, query)
+    return await _search_cache.get_or_set(
+        query.strip().lower(), lambda: asyncio.to_thread(_search_stocks, query)
+    )
 
 
 async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:

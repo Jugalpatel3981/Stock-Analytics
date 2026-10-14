@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db_session
+from app.core.rate_limit import chat_rate_limit
 from app.models.user import User
 from app.schemas.chat import (
     ChatExchangeResponse,
@@ -50,7 +51,11 @@ async def delete_chat_session(
     await chat_service.delete_session(session, current_user.id, session_id)
 
 
-@router.post("/sessions/{session_id}/messages", response_model=ChatExchangeResponse)
+@router.post(
+    "/sessions/{session_id}/messages",
+    response_model=ChatExchangeResponse,
+    dependencies=[Depends(chat_rate_limit)],
+)
 async def create_chat_message(
     session_id: int,
     message_create: ChatMessageCreate,
