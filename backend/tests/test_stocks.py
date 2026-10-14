@@ -7,6 +7,7 @@ from app.main import app
 from app.models.user import User
 from app.schemas.stock import (
     HistoricalPricePoint,
+    PredictionBacktest,
     StockDetail,
     StockHistoryResponse,
     StockNewsItem,
@@ -259,7 +260,18 @@ def test_read_stock_prediction(monkeypatch) -> None:
             latest_close=240.52,
             expected_price_low=238.12,
             expected_price_high=252.24,
-            confidence_score=87.4,
+            predicted_return_percent=1.937,
+            direction="up",
+            backtest=PredictionBacktest(
+                test_days=500,
+                direction_accuracy=52.4,
+                baseline_direction_accuracy=53.1,
+                mae=4.1,
+                baseline_mae=4.2,
+                skill_score=2.38,
+                strategy_return=18.2,
+                buy_and_hold_return=31.5,
+            ),
             prediction_timestamp="2026-06-25T12:00:00+00:00",
         )
 
@@ -276,5 +288,7 @@ def test_read_stock_prediction(monkeypatch) -> None:
     assert payload["predicted_close"] == 245.18
     assert payload["expected_price_low"] == 238.12
     assert payload["expected_price_high"] == 252.24
-    assert payload["confidence_score"] == 87.4
+    assert payload["direction"] == "up"
+    assert payload["backtest"]["baseline_mae"] == 4.2
+    assert "confidence_score" not in payload
     assert payload["data_source"] == "Production ML pipeline"

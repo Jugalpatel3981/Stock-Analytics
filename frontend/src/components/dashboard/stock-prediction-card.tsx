@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainCircuit, Clock, Hourglass, Search } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Clock, Hourglass, Search } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
-import { getStockPrediction, type StockPrediction } from "@/lib/api";
+import { getStockPrediction, type PredictionBacktest, type StockPrediction } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type ReadyStockPrediction = StockPrediction & {
   status: "ready";
@@ -16,7 +17,8 @@ type ReadyStockPrediction = StockPrediction & {
   latest_close: number;
   expected_price_low: number;
   expected_price_high: number;
-  confidence_score: number;
+  predicted_return_percent: number;
+  direction: "up" | "down" | "flat";
 };
 
 function formatCurrency(value: number) {
@@ -52,7 +54,79 @@ function isReadyPrediction(prediction: StockPrediction): prediction is ReadyStoc
     prediction.latest_close !== null &&
     prediction.expected_price_low !== null &&
     prediction.expected_price_high !== null &&
-    prediction.confidence_score !== null
+    prediction.predicted_return_percent !== null &&
+    prediction.direction !== null
+  );
+}
+
+function formatPercent(value: number, digits = 1) {
+  return `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
+}
+
+const directionStyles = {
+  up: { icon: ArrowUpRight, className: "bg-emerald-500/15 text-emerald-400" },
+  down: { icon: ArrowDownRight, className: "bg-red-500/15 text-red-400" },
+  flat: { icon: ArrowRight, className: "bg-secondary text-secondary-foreground" },
+} as const;
+
+function BacktestRow({ label, model, baseline }: { label: string; model: string; baseline: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span>
+        <span className="font-semibold">{model}</span>
+        <span className="text-muted-foreground"> vs {baseline}</span>
+      </span>
+    </div>
+  );
+}
+
+function BacktestSummary({ backtest }: { backtest: PredictionBacktest }) {
+  const beatsNaive = backtest.skill_score > 0;
+
+  return (
+    <div className="rounded-md border bg-background/40 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-xs font-medium uppercase text-muted-foreground">Track record</p>
+        <p className="text-xs text-muted-foreground">
+          Walk-forward backtest, {backtest.test_days} unseen trading days
+        </p>
+      </div>
+      <div className="mt-2 divide-y divide-border">
+        <BacktestRow
+          label="Direction accuracy"
+          model={`${backtest.direction_accuracy.toFixed(1)}%`}
+          baseline={`${backtest.baseline_direction_accuracy.toFixed(1)}% baseline`}
+        />
+        <BacktestRow
+          label="Avg. price error"
+          model={formatCurrency(backtest.mae)}
+          baseline={`${formatCurrency(backtest.baseline_mae)} "no change"`}
+        />
+        <BacktestRow
+          label="Strategy return"
+          model={formatPercent(backtest.strategy_return)}
+          baseline={`${formatPercent(backtest.buy_and_hold_return)} buy & hold`}
+        />
+      </div>
+      <p className={cn("mt-3 text-xs leading-5", beatsNaive ? "text-emerald-400" : "text-muted-foreground")}>
+        {beatsNaive
+          ? `Beats the "no change" forecast by ${backtest.skill_score.toFixed(1)}%.`
+          : `Does not beat the "no change" forecast (${formatPercent(backtest.skill_score)}).`}{" "}
+        <span className="text-muted-foreground">Next-day moves are mostly noise, so treat this as weak evidence.</span>
+      </p>
+    </div>
+  );
+}
+
+function PredictionDirectionBadge({ prediction }: { prediction: ReadyStockPrediction }) {
+  const { icon: Icon, className } = directionStyles[prediction.direction];
+
+  return (
+    <div className={cn("flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-semibold", className)}>
+      <Icon className="h-4 w-4" aria-hidden="true" />
+      {formatPercent(prediction.predicted_return_percent, 2)}
+    </div>
   );
 }
 
@@ -107,28 +181,24 @@ export function StockPredictionCard() {
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">{prediction.prediction_horizon}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <BrainCircuit className="h-5 w-5" aria-hidden="true" />
-              </div>
+              <PredictionDirectionBadge prediction={prediction} />
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border bg-background/40 p-3">
               <p className="text-xs uppercase text-muted-foreground">Latest Daily Close</p>
               <p className="mt-2 text-sm font-semibold">{formatCurrency(prediction.latest_close)}</p>
             </div>
             <div className="rounded-md border bg-background/40 p-3">
-              <p className="text-xs uppercase text-muted-foreground">Expected Range</p>
+              <p className="text-xs uppercase text-muted-foreground">Typical Range</p>
               <p className="mt-2 text-sm font-semibold">
                 {formatCurrency(prediction.expected_price_low)} - {formatCurrency(prediction.expected_price_high)}
               </p>
             </div>
-            <div className="rounded-md border bg-background/40 p-3">
-              <p className="text-xs uppercase text-muted-foreground">Confidence</p>
-              <p className="mt-2 text-sm font-semibold">{prediction.confidence_score.toFixed(2)}%</p>
-            </div>
           </div>
+
+          {prediction.backtest ? <BacktestSummary backtest={prediction.backtest} /> : null}
 
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">Production model</Badge>
@@ -154,7 +224,7 @@ export function StockPredictionCard() {
         </div>
       ) : (
         <div className="rounded-md border bg-background/40 p-4 text-sm leading-6 text-muted-foreground">
-          Uses the latest saved production model trained in the background from historical prices, volume, and technical indicators.
+          Predicts the next trading day&apos;s return with an XGBoost model trained on technical indicators, and shows how the model performed on past data it never saw.
         </div>
       )}
     </div>

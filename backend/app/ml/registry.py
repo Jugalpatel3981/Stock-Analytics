@@ -14,7 +14,11 @@ from app.core.config import get_settings
 from app.models.ml import MLModel
 from app.services.stock_service import normalize_ticker
 
-MODEL_TYPE = "xgboost"
+# Bump when features or the prediction target change so older artifacts are ignored.
+MODEL_TYPE = "xgboost-return-v2"
+# A retrained model sees newer data, so it replaces production unless its skill
+# score is clearly worse than the current model's.
+PROMOTION_TOLERANCE = 1.0
 
 
 def get_models_root() -> Path:
@@ -78,14 +82,13 @@ def should_promote_model(
     if production_record is None or not model_artifact_exists(production_record):
         return True
 
-    production_metrics = parse_metrics(production_record)
-    production_mape = production_metrics.get("mape")
-    candidate_mape = candidate_metrics.get("mape")
+    production_skill = parse_metrics(production_record).get("skill_score")
+    candidate_skill = candidate_metrics.get("skill_score")
 
-    if production_mape is None or candidate_mape is None:
+    if candidate_skill is None:
         return False
 
-    return candidate_mape < production_mape
+    return production_skill is None or candidate_skill >= production_skill - PROMOTION_TOLERANCE
 
 
 async def register_model(

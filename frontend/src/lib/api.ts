@@ -79,14 +79,27 @@ export type StockNewsResponse = {
   data_source: string;
 };
 
+export type PredictionBacktest = {
+  test_days: number;
+  direction_accuracy: number;
+  baseline_direction_accuracy: number;
+  mae: number;
+  baseline_mae: number;
+  skill_score: number;
+  strategy_return: number;
+  buy_and_hold_return: number;
+};
+
 export type StockPrediction = {
   ticker: string;
   status: "ready" | "preparing";
   predicted_close: number | null;
+  predicted_return_percent: number | null;
+  direction: "up" | "down" | "flat" | null;
   latest_close: number | null;
   expected_price_low: number | null;
   expected_price_high: number | null;
-  confidence_score: number | null;
+  backtest: PredictionBacktest | null;
   prediction_timestamp: string | null;
   message: string | null;
   prediction_horizon: string;
