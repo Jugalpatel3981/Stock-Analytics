@@ -4,6 +4,25 @@ import { redirect } from "next/navigation";
 import type { AuthUser } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/env";
 
+export async function getOptionalUser(): Promise<AuthUser | null> {
+  const cookieHeader = (await cookies()).toString();
+  if (!cookieHeader) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
+      headers: {
+        Cookie: cookieHeader,
+      },
+      cache: "no-store",
+    });
+    return response.ok ? ((await response.json()) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requireAuthenticatedUser(): Promise<AuthUser> {
   const cookieHeader = (await cookies()).toString();
 

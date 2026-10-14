@@ -13,6 +13,7 @@ from app.schemas.auth import (
     UserLogin,
     UserRead,
 )
+from app.services import demo_service
 from app.services.user_service import authenticate_user, create_user, get_user_by_email
 
 router = APIRouter()
@@ -79,6 +80,20 @@ async def login(
     set_auth_cookie(response, access_token)
 
     return AuthResponse(user=serialize_user(authenticated_user))
+
+
+@router.post("/demo", response_model=AuthResponse)
+async def demo_login(
+    response: Response,
+    session: AsyncSession = Depends(get_db_session),
+) -> AuthResponse:
+    if not get_settings().demo_mode_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo mode is disabled")
+
+    user = await demo_service.get_or_create_demo_user(session)
+    set_auth_cookie(response, create_access_token(subject=str(user.id)))
+
+    return AuthResponse(user=serialize_user(user))
 
 
 @router.post("/logout", response_model=MessageResponse)

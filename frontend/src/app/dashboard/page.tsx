@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Newspaper, Sparkles } from "lucide-react";
 
 import { DashboardMetrics } from "@/components/dashboard/dashboard-metrics";
+import { DashboardNews } from "@/components/dashboard/dashboard-news";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardWatchlist } from "@/components/dashboard/dashboard-watchlist";
 import { LiveMarketOverview } from "@/components/dashboard/live-market-overview";
@@ -14,11 +15,10 @@ import { Button } from "@/components/ui/button";
 import type { AuthUser } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/env";
 
-
-const newsItems = [
-  { source: "Market Desk", title: "Semiconductors lead early session gains", time: "12 min ago" },
-  { source: "Earnings Watch", title: "Mega-cap technology earnings remain in focus", time: "34 min ago" },
-  { source: "Macro Brief", title: "Treasury yields steady ahead of inflation data", time: "1 hr ago" },
+const assistantPrompts = [
+  "Why did NVDA move today? Cite your sources.",
+  "Summarize the latest news and sentiment for AAPL.",
+  "What does the prediction model say about TSLA, and how reliable has it been?",
 ];
 
 async function getCurrentUser(): Promise<AuthUser> {
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
           <div className="space-y-5">
             <SectionPanel
               title="Stock Prediction"
-              description="XGBoost next-close estimate"
+              description="XGBoost next-day return, backtested"
               action={<Badge variant="secondary">ML Signal</Badge>}
             >
               <StockPredictionCard />
@@ -73,14 +73,17 @@ export default async function DashboardPage() {
               description="Research support, not financial advice"
               action={<Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />}
             >
-              <div className="rounded-md border bg-background/40 p-4">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Portfolio is currently concentrated in technology. Review sector exposure, valuation risk, and upcoming earnings before making investment decisions.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Badge variant="secondary">Informational</Badge>
-                  <Badge variant="outline">Confidence: Medium</Badge>
-                </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase text-muted-foreground">Try asking</p>
+                {assistantPrompts.map((prompt) => (
+                  <Link
+                    key={prompt}
+                    className="block rounded-md border bg-background/40 p-3 text-sm leading-5 transition-colors hover:border-primary/60"
+                    href={`/assistant?prompt=${encodeURIComponent(prompt)}`}
+                  >
+                    {prompt}
+                  </Link>
+                ))}
               </div>
               <Button className="mt-4 w-full" variant="secondary" asChild>
                 <Link href="/assistant">
@@ -107,20 +110,10 @@ export default async function DashboardPage() {
 
           <SectionPanel
             title="News"
-            description="Source-backed market context"
+            description="Latest headlines with AI sentiment"
             action={<Newspaper className="h-5 w-5 text-primary" aria-hidden="true" />}
           >
-            <div className="space-y-3">
-              {newsItems.map((item) => (
-                <article key={item.title} className="rounded-md border bg-background/40 p-4">
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>{item.source}</span>
-                    <span>{item.time}</span>
-                  </div>
-                  <h2 className="mt-2 text-sm font-medium leading-5">{item.title}</h2>
-                </article>
-              ))}
-            </div>
+            <DashboardNews />
           </SectionPanel>
         </div>
 

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "access_token"
     auth_cookie_secure: bool = False
     auto_create_tables: bool = False
+    demo_mode_enabled: bool = True
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     groq_api_key: str | None = None

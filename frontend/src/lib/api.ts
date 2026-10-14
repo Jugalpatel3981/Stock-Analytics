@@ -249,6 +249,12 @@ export function loginUser(input: { email: string; password: string }) {
   });
 }
 
+export function demoLogin() {
+  return apiRequest<AuthResponse>("/auth/demo", {
+    method: "POST",
+  });
+}
+
 export function logoutUser() {
   return apiRequest<{ message: string }>("/auth/logout", {
     method: "POST",
