@@ -134,7 +134,6 @@ export type ChatMessage = {
   content: string;
   created_at: string;
   stock_symbol: string | null;
-  confidence_score: number | null;
   sources: ChatSource[];
 };
 

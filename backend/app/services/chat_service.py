@@ -35,7 +35,6 @@ class MarketContext:
     context: str
     sources: list[ChatSourceRead]
     symbols: list[str]
-    confidence_score: int
 
 
 def _session_to_read(session: ChatSession) -> ChatSessionRead:
@@ -59,7 +58,6 @@ def _message_to_read(
         content=message.content,
         created_at=message.created_at,
         stock_symbol=stock_symbol,
-        confidence_score=85 if message.role == "assistant" and source_list else None,
         sources=source_list,
     )
 
@@ -216,6 +214,7 @@ def _source_line(source: ChatSourceRead, detail: str | None = None) -> str:
 
 
 async def _build_market_context(
+    session: AsyncSession,
     content: str,
     fallback_symbols: list[str] | None = None,
 ) -> MarketContext:
@@ -293,15 +292,12 @@ async def _build_market_context(
             context="No specific ticker was detected. Ask the user for the company or ticker before analyzing.",
             sources=[],
             symbols=[],
-            confidence_score=30,
         )
 
-    confidence_score = 85 if sources else 55
     return MarketContext(
         context="\n\n".join(context_sections),
         sources=sources[:12],
         symbols=tickers,
-        confidence_score=confidence_score,
     )
 
 
@@ -393,5 +389,5 @@ async def create_message_exchange(
         assistant_message=_message_to_read(
             assistant_message,
             market_context.sources,
-        ).model_copy(update={"confidence_score": market_context.confidence_score}),
+        ),
     )

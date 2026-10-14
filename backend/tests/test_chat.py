@@ -151,3 +151,31 @@ def test_extract_tickers_understands_company_names_without_common_words() -> Non
     tickers = chat_service._extract_tickers("what is tesla stock currently doing good or not?")
 
     assert tickers == ["TSLA"]
+
+
+async def test_build_market_context_includes_prediction_context(monkeypatch) -> None:
+    async def unavailable(*_args, **_kwargs):
+        raise RuntimeError("upstream unavailable")
+
+    async def fake_prediction_context(_session, ticker: str) -> str:
+        return f"{ticker} prediction evidence"
+
+    async def no_web_results(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(chat_service.stock_service, "get_stock_detail", unavailable)
+    monkeypatch.setattr(chat_service.stock_service, "get_stock_news", unavailable)
+    monkeypatch.setattr(
+        chat_service.prediction_service,
+        "get_prediction_explanation_context",
+        fake_prediction_context,
+    )
+    monkeypatch.setattr(chat_service.tavily_service, "search_market_news", no_web_results)
+
+    market_context = await chat_service._build_market_context(
+        object(),  # type: ignore[arg-type]
+        "What does the model predict for $NVDA?",
+    )
+
+    assert market_context.symbols == ["NVDA"]
+    assert "NVDA prediction evidence" in market_context.context
