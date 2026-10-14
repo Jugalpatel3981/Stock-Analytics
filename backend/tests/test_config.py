@@ -28,3 +28,23 @@ def test_development_allows_default_settings() -> None:
     settings = Settings(app_env="development", _env_file=None)
 
     assert settings.app_env == "development"
+
+
+def test_hosted_database_urls_are_adapted_for_asyncpg() -> None:
+    settings = Settings(
+        database_url=(
+            "postgresql://user:secret@ep-example.neon.tech/neondb"
+            "?sslmode=require&channel_binding=require"
+        ),
+        _env_file=None,
+    )
+
+    assert settings.database_url == (
+        "postgresql+asyncpg://user:secret@ep-example.neon.tech/neondb?ssl=require"
+    )
+
+
+def test_asyncpg_database_url_is_unchanged() -> None:
+    url = "postgresql+asyncpg://stock_user:stock_password@localhost:5432/stock_intelligence"
+
+    assert Settings(database_url=url, _env_file=None).database_url == url

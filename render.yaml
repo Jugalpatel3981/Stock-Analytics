@@ -1,0 +1,34 @@
+# Render Blueprint for the backend API. See docs/deployment.md.
+# The database is hosted on Neon (Render's free Postgres expires after 30 days), and the
+# frontend is hosted on Vercel.
+services:
+  - type: web
+    name: ai-stock-api
+    runtime: docker
+    plan: free
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DEMO_MODE_ENABLED
+        value: "true"
+      - key: ML_SCHEDULER_INITIAL_DELAY_SECONDS
+        value: "120"
+      # Values below are entered in the Render dashboard when the Blueprint is created.
+      - key: DATABASE_URL
+        sync: false
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false

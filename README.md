@@ -72,7 +72,7 @@ flow, the AI assistant and the ML pipeline.
 | Data and ML | PostgreSQL, pandas, NumPy, XGBoost, yfinance |
 | AI | Groq (Llama 3.3 70B), Tavily search |
 | Market data | Finnhub WebSocket and REST, Yahoo Finance |
-| DevOps | Docker, Docker Compose, GitHub Actions |
+| DevOps | Docker, Docker Compose, Alembic, GitHub Actions, Render, Vercel, Neon |
 
 ## Prediction model: honest evaluation
 
@@ -123,6 +123,11 @@ Open **http://localhost:3000** and click **Try the live demo**.
 | Frontend | http://localhost:3000 |
 | API docs (Swagger) | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
+
+### Deploy for free
+
+The live demo runs on Vercel, Render and Neon free tiers. See
+**[docs/deployment.md](docs/deployment.md)** for a 15-minute walkthrough.
 
 <details>
 <summary><b>Run without Docker</b></summary>

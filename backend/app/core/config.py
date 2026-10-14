@@ -1,7 +1,8 @@
 import json
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,26 @@ class Settings(BaseSettings):
     ml_scheduler_initial_delay_seconds: int = 30
     ml_default_symbols: str = "AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM"
     ml_min_training_rows: int = 120
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_asyncpg_url(cls, value: str) -> str:
+        """Accept URLs as hosting providers show them (e.g. Neon, Render) and adapt for asyncpg."""
+        parts = urlsplit(value)
+        scheme = parts.scheme
+        if scheme in ("postgres", "postgresql"):
+            scheme = "postgresql+asyncpg"
+
+        query = []
+        for key, item in parse_qsl(parts.query):
+            if key == "sslmode":
+                # asyncpg spells this option "ssl".
+                query.append(("ssl", item))
+            elif key != "channel_binding":
+                # asyncpg does not accept channel_binding.
+                query.append((key, item))
+
+        return urlunsplit(parts._replace(scheme=scheme, query=urlencode(query)))
 
     @model_validator(mode="after")
     def _require_production_secrets(self) -> "Settings":
