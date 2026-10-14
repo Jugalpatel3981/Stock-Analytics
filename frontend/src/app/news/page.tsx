@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { SectionPanel } from "@/components/dashboard/section-panel";
 import { StockNewsFeed } from "@/components/news/stock-news-feed";
 import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
+
+export const metadata: Metadata = { title: "News & Sentiment" };
 
 type NewsPageProps = {
   searchParams?: Promise<{ ticker?: string | string[] }>;

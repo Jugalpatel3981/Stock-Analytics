@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -14,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AuthUser } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/env";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 const assistantPrompts = [
   "Why did NVDA move today? Cite your sources.",

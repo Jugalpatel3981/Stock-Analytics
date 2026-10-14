@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { SectionPanel } from "@/components/dashboard/section-panel";
 import { PopularLiveStocks } from "@/components/stocks/popular-live-stocks";
 import { StockSearchForm } from "@/components/stocks/stock-search-form";
 import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
+
+export const metadata: Metadata = { title: "Stocks" };
 
 export default async function StocksPage() {
   const user = await requireAuthenticatedUser();

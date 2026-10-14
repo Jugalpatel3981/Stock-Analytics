@@ -1,0 +1,35 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+[Semantic Versioning](https://semver.org/).
+
+## [1.0.0] - 2026-10-15
+
+First public release.
+
+### Added
+- Landing page with one-click demo login and a seeded sample portfolio and watchlist.
+- Walk-forward backtesting for the prediction model, compared with naive baselines and
+  buy-and-hold, shown next to every prediction.
+- News sentiment classified by an LLM (Groq), batched and cached.
+- Alembic database migrations, applied automatically on start.
+- Caching for Yahoo Finance calls and rate limits on login, registration, demo login and chat.
+- Free-tier deployment on Vercel, Render and Neon (`render.yaml`, `docs/deployment.md`).
+- Site icon, link-preview image, per-page titles, and friendly error and 404 pages.
+- CI for linting, tests, migrations, type-checking, builds and Docker images.
+
+### Changed
+- The model predicts next-day returns from scale-free features instead of raw prices.
+- Trained models are stored in PostgreSQL instead of the local disk.
+- Browser API calls go through the frontend's own domain, so logins work when the frontend
+  and backend are hosted separately.
+
+### Fixed
+- The AI assistant failed on every message.
+- Portfolio and news pages crashed when Yahoo Finance was unavailable.
+- Portfolio totals showed a total loss when prices were missing.
+
+### Removed
+- Hardcoded confidence scores, placeholder headlines and a static AI insight.
+- The Hugging Face dependency and per-phase build logs.

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { PortfolioManager } from "@/components/portfolio/portfolio-manager";
 import { getAuthCookieHeader, requireAuthenticatedUser } from "@/lib/auth-server";
 import type { PortfolioGrowthResponse, PortfolioSummary } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/env";
+
+export const metadata: Metadata = { title: "Portfolio" };
 
 async function getPortfolioSummary(): Promise<PortfolioSummary> {
   const cookieHeader = await getAuthCookieHeader();

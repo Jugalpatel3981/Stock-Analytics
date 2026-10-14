@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { AiChat } from "@/components/assistant/ai-chat";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
+
+export const metadata: Metadata = { title: "AI Assistant" };
 
 type AssistantPageProps = {
   searchParams?: Promise<{ prompt?: string | string[] }>;
