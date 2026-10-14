@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -14,6 +14,8 @@ class MLModel(Base):
     model_type: Mapped[str] = mapped_column(String(80), nullable=False, default="xgboost")
     version: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     model_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Serialized model, stored in the database so it survives ephemeral server disks.
+    artifact: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     feature_columns_json: Mapped[str] = mapped_column(Text, nullable=False)
     metrics_json: Mapped[str] = mapped_column(Text, nullable=False)
     is_production: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)

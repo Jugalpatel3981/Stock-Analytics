@@ -82,7 +82,7 @@ async def get_stock_prediction(session: AsyncSession, ticker: str) -> StockPredi
             prediction_timestamp=datetime.now(UTC).isoformat(),
         )
 
-    model = await registry.load_model_artifact(model_record.model_path)
+    model = await registry.load_model_artifact(model_record)
     latest_features = feature_set.latest_features[FEATURE_COLUMNS].iloc[[-1]]
     predicted_return = float(model.predict(latest_features)[0])
     latest_close = float(feature_set.latest_features["close"].iloc[-1])

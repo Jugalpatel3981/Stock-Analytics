@@ -156,3 +156,27 @@ def test_backtest_report_lists_each_ticker(monkeypatch) -> None:
     assert "| AAPL |" in report
     assert "Skipped: BAD (no data)" in report
     assert "## Methodology" in report
+
+
+def test_model_round_trips_through_database_bytes() -> None:
+    candidate = fit_candidate(_price_rows(300, noise_seed=5), min_training_rows=120)
+    features = build_feature_set(_price_rows(300, noise_seed=5)).latest_features[FEATURE_COLUMNS]
+
+    restored = registry.deserialize_model(registry.serialize_model(candidate.model))
+
+    np.testing.assert_allclose(restored.predict(features), candidate.model.predict(features))
+
+
+def test_model_freshness_uses_training_time() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.ml import MLModel
+
+    def record(age: timedelta, artifact: bytes | None = b"model") -> MLModel:
+        return MLModel(artifact=artifact, trained_at=datetime.now(UTC) - age)
+
+    max_age = timedelta(days=4)
+    assert registry.is_model_fresh(record(timedelta(days=1)), max_age) is True
+    assert registry.is_model_fresh(record(timedelta(days=5)), max_age) is False
+    assert registry.is_model_fresh(record(timedelta(days=1), artifact=None), max_age) is False
+    assert registry.is_model_fresh(None, max_age) is False

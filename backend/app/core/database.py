@@ -2,9 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async
 
 from app.core.config import get_settings
 
-# Import model modules so SQLAlchemy metadata knows about tables during create_all.
+# Import model modules so SQLAlchemy metadata (used by Alembic) knows about every table.
 from app.models import chat, market_data, ml, portfolio, user, watchlist  # noqa: F401
-from app.models.base import Base
 
 settings = get_settings()
 
@@ -20,8 +19,3 @@ async_session_factory = async_sessionmaker(
     autoflush=False,
     expire_on_commit=False,
 )
-
-
-async def create_database_tables() -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)

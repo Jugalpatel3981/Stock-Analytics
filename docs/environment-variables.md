@@ -28,7 +28,6 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 AUTH_COOKIE_NAME=access_token
 AUTH_COOKIE_SECURE=false
-AUTO_CREATE_TABLES=true
 DEMO_MODE_ENABLED=true
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
@@ -64,7 +63,6 @@ Use these production settings:
 ```text
 APP_ENV=production
 AUTH_COOKIE_SECURE=true
-AUTO_CREATE_TABLES=false
 BACKEND_CORS_ORIGINS=https://your-frontend-domain.com
 NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain.com/api/v1
 API_INTERNAL_BASE_URL=https://your-backend-domain.com/api/v1

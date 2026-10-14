@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     auth_cookie_name: str = "access_token"
     auth_cookie_secure: bool = False
-    auto_create_tables: bool = False
     demo_mode_enabled: bool = True
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
@@ -30,7 +29,6 @@ class Settings(BaseSettings):
     ml_scheduler_enabled: bool = True
     ml_retrain_interval_days: int = 4
     ml_scheduler_initial_delay_seconds: int = 30
-    ml_models_dir: str = "models"
     ml_default_symbols: str = "AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM"
     ml_min_training_rows: int = 120
 

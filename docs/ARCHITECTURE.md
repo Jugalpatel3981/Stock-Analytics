@@ -23,7 +23,6 @@ flowchart LR
     end
 
     DB[(PostgreSQL)]
-    Models[(Model artifacts<br/>joblib)]
 
     Finnhub[[Finnhub<br/>WebSocket + REST]]
     Yahoo[[Yahoo Finance<br/>yfinance]]
@@ -44,8 +43,6 @@ flowchart LR
     API --> DB
     ML --> Yahoo
     ML --> DB
-    ML --> Models
-    API -->|predictions| Models
 ```
 
 ## Backend layout
@@ -62,6 +59,13 @@ backend/app/
 ```
 
 Routes stay thin and call services, so business logic can be tested without HTTP.
+
+The schema is managed with **Alembic** (`backend/migrations/`). The container applies pending
+migrations on start with `python -m app.scripts.init_db`, and CI checks that the models and
+migrations match.
+
+Yahoo Finance responses are cached in memory for 30 seconds to an hour depending on the data,
+and login, registration, demo login and assistant messages are rate-limited per client IP.
 
 ## Authentication
 
@@ -109,8 +113,8 @@ article is only classified once. Without a `GROQ_API_KEY`, every article falls b
 | Features | `feature_engineering.py` | 19 scale-free features: returns, moving-average gaps, MACD, RSI, Bollinger, volume ratios, volatility |
 | Train | `trainer.py` | XGBoost regressor on the next-day return |
 | Evaluate | `evaluator.py` | Walk-forward validation against a "no change" forecast and the majority direction |
-| Register | `registry.py` | Saves artifacts and promotes a model unless its skill score is clearly worse |
-| Schedule | `scheduler.py` | Retrains watchlist, portfolio and default symbols every few days; unseen tickers are queued on demand |
+| Register | `registry.py` | Stores the serialized model in PostgreSQL (so it survives restarts on hosts with temporary disks) and promotes it unless its skill score is clearly worse |
+| Schedule | `scheduler.py` | Retrains watchlist, portfolio and default symbols when their model is older than `ML_RETRAIN_INTERVAL_DAYS`; unseen tickers are queued on demand |
 | Report | `backtest.py` | Generates [`model-performance.md`](model-performance.md) |
 
 Predictions are never trained inside a request. A ticker without a model returns a `preparing`
@@ -125,6 +129,7 @@ look-ahead bias.
 GitHub Actions runs on every push and pull request:
 
 - **Backend:** ruff lint, ruff format check, pytest
+- **Migrations:** applied to a real PostgreSQL, then `alembic check`
 - **Frontend:** ESLint, TypeScript type-check, production build
 - **Docker:** builds both images
 

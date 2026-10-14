@@ -36,6 +36,46 @@ jobs:
       - name: Run tests
         run: pytest
 
+  migrations:
+    name: Database Migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stock_user
+          POSTGRES_PASSWORD: stock_password
+          POSTGRES_DB: stock_intelligence
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stock_user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://stock_user:stock_password@localhost:5432/stock_intelligence
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Apply migrations
+        run: python -m app.scripts.init_db
+
+      - name: Check models match migrations
+        run: alembic check
+
   frontend:
     name: Frontend Lint, Type-check & Build
     runs-on: ubuntu-latest

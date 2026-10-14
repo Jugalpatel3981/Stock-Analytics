@@ -34,7 +34,7 @@ track a portfolio, and see a next-day forecast together with the model's real tr
 | 🧠 | **Backtested predictions** | XGBoost predicts the next-day return. Each prediction shows walk-forward accuracy against simple baselines. |
 | 💼 | **Portfolio and watchlists** | Live gain/loss, a portfolio growth chart, and multiple watchlists. |
 | 🔐 | **Secure accounts** | bcrypt passwords and JWT sessions in HttpOnly cookies, plus a one-click demo account. |
-| ⚙️ | **Background ML pipeline** | A scheduler retrains models every few days, and a registry only promotes models that hold up. |
+| ⚙️ | **Production engineering** | Background retraining, models stored in PostgreSQL, Alembic migrations, caching, rate limiting and CI. |
 
 ## Screenshots
 
@@ -58,8 +58,6 @@ flowchart LR
     API --> Tavily[[Tavily]]
     API --> DB[(PostgreSQL)]
     Scheduler[ML scheduler] --> DB
-    Scheduler --> Models[(XGBoost models)]
-    API --> Models
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design: auth, market data

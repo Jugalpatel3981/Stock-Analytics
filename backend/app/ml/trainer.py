@@ -142,7 +142,8 @@ async def train_model_for_ticker(
             fit_candidate, price_rows, settings.ml_min_training_rows
         )
         version = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
-        model_path = await registry.save_model_artifact(normalized_ticker, version, candidate.model)
+        model_path = registry.artifact_name(normalized_ticker, version)
+        artifact = await asyncio.to_thread(registry.serialize_model, candidate.model)
 
         metrics_payload = candidate.metrics.as_dict()
         production_record = await registry.get_production_model_record(session, normalized_ticker)
@@ -152,6 +153,7 @@ async def train_model_for_ticker(
             ticker=normalized_ticker,
             version=version,
             model_path=model_path,
+            artifact=artifact,
             feature_columns=FEATURE_COLUMNS,
             metrics=metrics_payload,
             is_production=should_promote,

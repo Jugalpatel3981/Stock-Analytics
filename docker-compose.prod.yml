@@ -29,7 +29,6 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-access_token}
       AUTH_COOKIE_SECURE: "true"
-      AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
@@ -39,8 +38,6 @@ services:
       TAVILY_SEARCH_DEPTH: ${TAVILY_SEARCH_DEPTH:-basic}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - backend-models:/app/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +74,5 @@ services:
 
 volumes:
   postgres-data:
-  backend-models:
 
 

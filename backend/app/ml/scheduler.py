@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import suppress
+from datetime import timedelta
 
 from app.core.config import Settings
 from app.core.database import async_session_factory
+from app.ml import registry
 from app.ml.symbols import get_tracked_symbols
 from app.ml.trainer import train_model_for_ticker
 from app.ml.training_queue import get_training_queue, mark_training_symbol_complete
@@ -105,7 +107,14 @@ class MLPipelineScheduler:
         async with async_session_factory() as session:
             symbols = await get_tracked_symbols(session)
 
+        max_age = timedelta(days=max(1, self.settings.ml_retrain_interval_days))
         for symbol in symbols:
+            async with async_session_factory() as session:
+                production_record = await registry.get_production_model_record(session, symbol)
+            if registry.is_model_fresh(production_record, max_age):
+                logger.info("Skipping %s: production model is newer than %s.", symbol, max_age)
+                continue
+
             await self._train_symbol(symbol)
 
         logger.info("ML pipeline run finished for %s symbols.", len(symbols))

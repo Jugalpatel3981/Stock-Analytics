@@ -40,8 +40,6 @@ Thumbs.db
 
 # Docker volumes and local data
 postgres-data/
-backend/models/*
-!backend/models/.gitkeep
 
 
 # Local diagnostic scratch files
