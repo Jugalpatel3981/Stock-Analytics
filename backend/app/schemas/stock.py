@@ -66,7 +66,7 @@ class StockNewsResponse(BaseModel):
     ticker: str
     articles: list[StockNewsItem]
     sentiment_trend: list[StockSentimentTrendPoint] = []
-    sentiment_model: str = "ProsusAI/finbert"
+    sentiment_model: str = "llama-3.3-70b-versatile via Groq"
     data_source: str = "Yahoo Finance via yfinance"
 
 

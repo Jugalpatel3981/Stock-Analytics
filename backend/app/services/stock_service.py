@@ -6,7 +6,6 @@ import httpx
 import yfinance as yf
 from fastapi import HTTPException, status
 
-from app.core.config import get_settings
 from app.schemas.stock import (
     HistoricalPricePoint,
     StockDetail,
@@ -336,23 +335,24 @@ async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
     normalized_ticker = normalize_ticker(ticker)
     articles = await asyncio.to_thread(_build_stock_news_items, normalized_ticker, limit)
 
-    enriched_articles: list[StockNewsItem] = []
-    for article in articles:
-        sentiment = await sentiment_service.analyze_sentiment(_build_sentiment_input(article))
-        enriched_articles.append(
-            article.model_copy(
-                update={
-                    "sentiment_label": sentiment.label,
-                    "sentiment_score": sentiment.score,
-                }
-            )
+    sentiments = await sentiment_service.analyze_sentiments(
+        [_build_sentiment_input(article) for article in articles]
+    )
+    enriched_articles = [
+        article.model_copy(
+            update={
+                "sentiment_label": sentiment.label,
+                "sentiment_score": sentiment.score,
+            }
         )
+        for article, sentiment in zip(articles, sentiments, strict=True)
+    ]
 
     return StockNewsResponse(
         ticker=normalized_ticker,
         articles=enriched_articles,
         sentiment_trend=_build_sentiment_trend(enriched_articles),
-        sentiment_model=get_settings().huggingface_sentiment_model,
+        sentiment_model=sentiment_service.sentiment_model_name(),
     )
 
 

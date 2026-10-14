@@ -39,7 +39,7 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
   const [activeTicker, setActiveTicker] = useState(initialTicker);
   const [articles, setArticles] = useState<StockNewsItem[]>([]);
   const [sentimentTrend, setSentimentTrend] = useState<StockSentimentTrendPoint[]>([]);
-  const [sentimentModel, setSentimentModel] = useState("ProsusAI/finbert");
+  const [sentimentModel, setSentimentModel] = useState("Groq LLM");
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 

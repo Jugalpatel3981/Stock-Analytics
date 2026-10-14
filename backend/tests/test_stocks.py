@@ -154,7 +154,7 @@ def test_read_stock_news(monkeypatch) -> None:
                     average_score=0.87,
                 )
             ],
-            sentiment_model="ProsusAI/finbert",
+            sentiment_model="llama-3.3-70b-versatile via Groq",
         )
 
     app.dependency_overrides[get_current_user] = override_current_user
@@ -172,7 +172,7 @@ def test_read_stock_news(monkeypatch) -> None:
     assert payload["articles"][0]["sentiment_label"] == "Positive"
     assert payload["articles"][0]["sentiment_score"] == 0.87
     assert payload["sentiment_trend"][0]["positive"] == 1
-    assert payload["sentiment_model"] == "ProsusAI/finbert"
+    assert payload["sentiment_model"] == "llama-3.3-70b-versatile via Groq"
 
 
 def test_search_stocks_by_company_name(monkeypatch) -> None:

@@ -19,8 +19,6 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "access_token"
     auth_cookie_secure: bool = False
     auto_create_tables: bool = False
-    huggingface_api_token: str | None = None
-    huggingface_sentiment_model: str = "ProsusAI/finbert"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     groq_api_key: str | None = None

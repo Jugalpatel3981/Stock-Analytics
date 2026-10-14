@@ -17,7 +17,7 @@ It is built as a production-minded monorepo with a Next.js frontend, FastAPI bac
 - Portfolio holdings, gain/loss, and growth chart
 - Finnhub WebSocket-powered live prices for dashboard, stocks, watchlists, and portfolio
 - Stock news filtered by ticker
-- HuggingFace-powered news sentiment analysis
+- LLM-powered news sentiment analysis (Groq), batched and cached
 - OpenAI-powered financial assistant with saved chat history, follow-up support, web research, and source citations
 - XGBoost next-day close prediction module
 - Dockerized frontend, backend, and PostgreSQL
@@ -31,7 +31,7 @@ It is built as a production-minded monorepo with a Next.js frontend, FastAPI bac
 | Frontend | Next.js 15, TypeScript, Tailwind CSS, ShadCN UI conventions |
 | Backend | FastAPI, Python 3.12, Pydantic Settings |
 | Database | PostgreSQL, SQLAlchemy async |
-| AI | OpenAI/Grok Responses APIs, HuggingFace sentiment model, Tavily Search |
+| AI | OpenAI/Grok Responses APIs, Groq LLM sentiment, Tavily Search |
 | Market Data | Yahoo Finance, Finnhub WebSocket |
 | ML | XGBoost, pandas, numpy, scikit-learn |
 | Charts | Recharts |
@@ -144,8 +144,6 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 GROQ_API_KEY=
 GROQ_MODEL=llama-3.3-70b-versatile
-HUGGINGFACE_API_TOKEN=
-HUGGINGFACE_SENTIMENT_MODEL=ProsusAI/finbert
 TAVILY_API_KEY=
 TAVILY_SEARCH_DEPTH=basic
 FINNHUB_API_KEY=
@@ -229,7 +227,7 @@ Before deploying for real:
 - Add the frontend domain to `BACKEND_CORS_ORIGINS`.
 - Configure a managed PostgreSQL database.
 - Run database initialization or migrations once.
-- Verify OpenAI and HuggingFace keys if using AI features.
+- Verify the Groq (or OpenAI) key if using AI features.
 
 ## Documentation
 
