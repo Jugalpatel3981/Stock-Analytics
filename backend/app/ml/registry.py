@@ -1,44 +1,41 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
-from datetime import UTC, datetime
-from pathlib import Path
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from joblib import dump, load
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.models.ml import MLModel
 from app.services.stock_service import normalize_ticker
 
-MODEL_TYPE = "xgboost"
+# Bump when features or the prediction target change so older artifacts are ignored.
+MODEL_TYPE = "xgboost-return-v2"
+# A retrained model sees newer data, so it replaces production unless its skill
+# score is clearly worse than the current model's.
+PROMOTION_TOLERANCE = 1.0
 
 
-def get_models_root() -> Path:
-    settings = get_settings()
-    root = Path(settings.ml_models_dir)
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+def serialize_model(model: Any) -> bytes:
+    buffer = io.BytesIO()
+    dump(model, buffer)
+    return buffer.getvalue()
 
 
-def _model_path(ticker: str, version: str) -> Path:
-    safe_ticker = normalize_ticker(ticker).replace("/", "-")
-    directory = get_models_root() / safe_ticker
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory / f"{MODEL_TYPE}-{version}.joblib"
+def deserialize_model(artifact: bytes) -> Any:
+    return load(io.BytesIO(artifact))
 
 
-async def save_model_artifact(ticker: str, version: str, model: Any) -> str:
-    path = _model_path(ticker, version)
-    await asyncio.to_thread(dump, model, path)
-    return str(path)
+def artifact_name(ticker: str, version: str) -> str:
+    return f"{MODEL_TYPE}/{normalize_ticker(ticker)}/{version}"
 
 
-async def load_model_artifact(model_path: str) -> Any:
-    return await asyncio.to_thread(load, model_path)
+async def load_model_artifact(model_record: MLModel) -> Any:
+    return await asyncio.to_thread(deserialize_model, model_record.artifact)
 
 
 async def get_production_model_record(session: AsyncSession, ticker: str) -> MLModel | None:
@@ -56,6 +53,17 @@ async def get_production_model_record(session: AsyncSession, ticker: str) -> MLM
     return result.scalar_one_or_none()
 
 
+def is_model_fresh(model_record: MLModel | None, max_age: timedelta) -> bool:
+    if not model_artifact_exists(model_record):
+        return False
+
+    trained_at = model_record.trained_at
+    if trained_at.tzinfo is None:
+        trained_at = trained_at.replace(tzinfo=UTC)
+
+    return datetime.now(UTC) - trained_at < max_age
+
+
 def parse_metrics(model_record: MLModel | None) -> dict[str, float]:
     if model_record is None:
         return {}
@@ -69,21 +77,22 @@ def parse_metrics(model_record: MLModel | None) -> dict[str, float]:
 
 
 def model_artifact_exists(model_record: MLModel | None) -> bool:
-    return model_record is not None and Path(model_record.model_path).exists()
+    return model_record is not None and model_record.artifact is not None
 
 
-def should_promote_model(candidate_metrics: dict[str, float], production_record: MLModel | None) -> bool:
+def should_promote_model(
+    candidate_metrics: dict[str, float], production_record: MLModel | None
+) -> bool:
     if production_record is None or not model_artifact_exists(production_record):
         return True
 
-    production_metrics = parse_metrics(production_record)
-    production_mape = production_metrics.get("mape")
-    candidate_mape = candidate_metrics.get("mape")
+    production_skill = parse_metrics(production_record).get("skill_score")
+    candidate_skill = candidate_metrics.get("skill_score")
 
-    if production_mape is None or candidate_mape is None:
+    if candidate_skill is None:
         return False
 
-    return candidate_mape < production_mape
+    return production_skill is None or candidate_skill >= production_skill - PROMOTION_TOLERANCE
 
 
 async def register_model(
@@ -92,6 +101,7 @@ async def register_model(
     ticker: str,
     version: str,
     model_path: str,
+    artifact: bytes,
     feature_columns: list[str],
     metrics: dict[str, float],
     is_production: bool,
@@ -110,6 +120,7 @@ async def register_model(
         model_type=MODEL_TYPE,
         version=version,
         model_path=model_path,
+        artifact=artifact,
         feature_columns_json=json.dumps(feature_columns),
         metrics_json=json.dumps(metrics),
         is_production=is_production,
@@ -118,5 +129,3 @@ async def register_model(
     session.add(model_record)
     await session.flush()
     return model_record
-
-

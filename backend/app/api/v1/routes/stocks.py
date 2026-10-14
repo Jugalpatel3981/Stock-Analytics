@@ -58,5 +58,3 @@ async def read_stock_prediction(
     session: AsyncSession = Depends(get_db_session),
 ) -> StockPredictionResponse:
     return await prediction_service.get_prediction(session, ticker)
-
-

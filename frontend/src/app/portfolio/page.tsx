@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { PortfolioManager } from "@/components/portfolio/portfolio-manager";
 import { getAuthCookieHeader, requireAuthenticatedUser } from "@/lib/auth-server";
 import type { PortfolioGrowthResponse, PortfolioSummary } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/env";
+
+export const metadata: Metadata = { title: "Portfolio" };
 
 async function getPortfolioSummary(): Promise<PortfolioSummary> {
   const cookieHeader = await getAuthCookieHeader();
@@ -50,7 +53,7 @@ export default async function PortfolioPage() {
           <p className="text-xs font-medium uppercase text-muted-foreground">Owned positions</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-normal">Portfolio</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Add holdings, monitor current value, and review gain/loss using live Yahoo Finance prices.
+            Add holdings, monitor current value, and review gain/loss using live market prices.
           </p>
         </div>
         <PortfolioManager initialSummary={summary} initialGrowth={growth.points} />

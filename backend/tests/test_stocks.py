@@ -7,13 +7,14 @@ from app.main import app
 from app.models.user import User
 from app.schemas.stock import (
     HistoricalPricePoint,
+    PredictionBacktest,
     StockDetail,
     StockHistoryResponse,
     StockNewsItem,
     StockNewsResponse,
     StockPredictionResponse,
-    StockSentimentTrendPoint,
     StockSearchResult,
+    StockSentimentTrendPoint,
 )
 from app.services import prediction_service, stock_service
 
@@ -154,7 +155,7 @@ def test_read_stock_news(monkeypatch) -> None:
                     average_score=0.87,
                 )
             ],
-            sentiment_model="ProsusAI/finbert",
+            sentiment_model="llama-3.3-70b-versatile via Groq",
         )
 
     app.dependency_overrides[get_current_user] = override_current_user
@@ -172,7 +173,7 @@ def test_read_stock_news(monkeypatch) -> None:
     assert payload["articles"][0]["sentiment_label"] == "Positive"
     assert payload["articles"][0]["sentiment_score"] == 0.87
     assert payload["sentiment_trend"][0]["positive"] == 1
-    assert payload["sentiment_model"] == "ProsusAI/finbert"
+    assert payload["sentiment_model"] == "llama-3.3-70b-versatile via Groq"
 
 
 def test_search_stocks_by_company_name(monkeypatch) -> None:
@@ -259,7 +260,18 @@ def test_read_stock_prediction(monkeypatch) -> None:
             latest_close=240.52,
             expected_price_low=238.12,
             expected_price_high=252.24,
-            confidence_score=87.4,
+            predicted_return_percent=1.937,
+            direction="up",
+            backtest=PredictionBacktest(
+                test_days=500,
+                direction_accuracy=52.4,
+                baseline_direction_accuracy=53.1,
+                mae=4.1,
+                baseline_mae=4.2,
+                skill_score=2.38,
+                strategy_return=18.2,
+                buy_and_hold_return=31.5,
+            ),
             prediction_timestamp="2026-06-25T12:00:00+00:00",
         )
 
@@ -276,6 +288,33 @@ def test_read_stock_prediction(monkeypatch) -> None:
     assert payload["predicted_close"] == 245.18
     assert payload["expected_price_low"] == 238.12
     assert payload["expected_price_high"] == 252.24
-    assert payload["confidence_score"] == 87.4
+    assert payload["direction"] == "up"
+    assert payload["backtest"]["baseline_mae"] == 4.2
+    assert "confidence_score" not in payload
     assert payload["data_source"] == "Production ML pipeline"
 
+
+async def test_yahoo_failures_become_bad_gateway(monkeypatch) -> None:
+    import pytest
+    from fastapi import HTTPException
+
+    def unreachable(_ticker: str):
+        raise ConnectionError("tunnel failed")
+
+    monkeypatch.setattr(stock_service, "_build_stock_detail", unreachable)
+
+    with pytest.raises(HTTPException) as caught:
+        await stock_service.get_stock_detail("NVDA")
+
+    assert caught.value.status_code == 502
+
+
+async def test_portfolio_price_is_none_when_provider_is_down(monkeypatch) -> None:
+    from app.services import portfolio_service
+
+    def unreachable(_ticker: str):
+        raise ConnectionError("tunnel failed")
+
+    monkeypatch.setattr(stock_service, "_build_stock_detail", unreachable)
+
+    assert await portfolio_service.get_current_price("NVDA") is None

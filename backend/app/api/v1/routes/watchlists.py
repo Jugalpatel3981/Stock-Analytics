@@ -35,7 +35,9 @@ async def read_watchlist(
     return await watchlist_service.get_watchlist(session, current_user.id, watchlist_id)
 
 
-@router.post("/{watchlist_id}/stocks", response_model=WatchlistRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{watchlist_id}/stocks", response_model=WatchlistRead, status_code=status.HTTP_201_CREATED
+)
 async def add_stock_to_watchlist(
     watchlist_id: int,
     stock_create: WatchlistStockCreate,

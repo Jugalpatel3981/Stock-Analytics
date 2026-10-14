@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
-from app.core.database import create_database_tables
 from app.ml.scheduler import MLPipelineScheduler
 
 settings = get_settings()
@@ -15,9 +14,6 @@ ml_scheduler = MLPipelineScheduler(settings)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
-    if settings.auto_create_tables:
-        await create_database_tables()
-
     ml_scheduler.start()
     try:
         yield
@@ -27,7 +23,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="1.0.0",
     openapi_url=f"{settings.api_v1_prefix}/openapi.json",
     lifespan=lifespan,
 )

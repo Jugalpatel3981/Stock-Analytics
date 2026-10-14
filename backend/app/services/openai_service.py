@@ -3,7 +3,6 @@ from fastapi import HTTPException, status
 
 from app.core.config import get_settings
 
-
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 

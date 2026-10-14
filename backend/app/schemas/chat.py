@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 ChatRole = Literal["user", "assistant"]
 
 
@@ -21,7 +20,6 @@ class ChatMessageRead(BaseModel):
     content: str
     created_at: datetime
     stock_symbol: str | None = None
-    confidence_score: int | None = None
     sources: list["ChatSourceRead"] = Field(default_factory=list)
 
 

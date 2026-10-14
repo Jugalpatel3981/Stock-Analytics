@@ -1,6 +1,6 @@
 [project]
 name = "ai-stock-intelligence-backend"
-version = "0.1.0"
+version = "1.0.0"
 description = "FastAPI backend for the AI Stock Intelligence Platform"
 requires-python = ">=3.12"
 
@@ -16,3 +16,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]

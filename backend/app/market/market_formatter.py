@@ -22,8 +22,4 @@ def to_int(value: Any) -> int | None:
 
 
 def normalize_symbols(symbols: str) -> list[str]:
-    return [
-        symbol.strip().upper()
-        for symbol in symbols.split(",")
-        if symbol.strip()
-    ][:25]
+    return [symbol.strip().upper() for symbol in symbols.split(",") if symbol.strip()][:25]

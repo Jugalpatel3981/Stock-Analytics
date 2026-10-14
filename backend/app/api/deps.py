@@ -38,6 +38,8 @@ async def get_current_user(
 
     try:
         payload = decode_access_token(token)
+        if payload.get("scope") is not None:
+            raise jwt.InvalidTokenError("Scoped tokens cannot be used for API access")
         subject = payload.get("sub")
         user_id = int(subject) if subject is not None else None
     except (jwt.PyJWTError, TypeError, ValueError):

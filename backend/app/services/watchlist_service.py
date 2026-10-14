@@ -76,7 +76,9 @@ async def remove_stock_from_watchlist(
 ) -> Watchlist:
     watchlist = await get_watchlist(session, user_id, watchlist_id)
     normalized_ticker = normalize_ticker(ticker)
-    stock_to_remove = next((stock for stock in watchlist.stocks if stock.ticker == normalized_ticker), None)
+    stock_to_remove = next(
+        (stock for stock in watchlist.stocks if stock.ticker == normalized_ticker), None
+    )
 
     if stock_to_remove is None:
         raise HTTPException(

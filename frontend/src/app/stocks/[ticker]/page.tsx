@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, ExternalLink } from "lucide-react";
@@ -67,6 +68,11 @@ async function getStockDetail(ticker: string): Promise<StockDetail> {
   }
 
   return response.json() as Promise<StockDetail>;
+}
+
+export async function generateMetadata({ params }: StockDetailPageProps): Promise<Metadata> {
+  const { ticker } = await params;
+  return { title: `${decodeURIComponent(ticker).toUpperCase()} stock` };
 }
 
 export default async function StockDetailPage({ params }: StockDetailPageProps) {

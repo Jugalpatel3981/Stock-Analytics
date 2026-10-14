@@ -297,9 +297,9 @@ export function AiChat({ initialPrompt }: AiChatProps) {
                     <div className="mt-4 rounded-md border bg-card/70 p-3">
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold uppercase text-muted-foreground">Sources</p>
-                        {message.confidence_score ? (
-                          <span className="text-xs text-muted-foreground">Confidence {message.confidence_score}%</span>
-                        ) : null}
+                        <span className="text-xs text-muted-foreground">
+                          {message.sources.length} {message.sources.length === 1 ? "source" : "sources"}
+                        </span>
                       </div>
                       <div className="space-y-2">
                         {message.sources.map((source, index) => (

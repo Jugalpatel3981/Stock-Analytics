@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -6,17 +8,19 @@ import httpx
 import yfinance as yf
 from fastapi import HTTPException, status
 
+from app.core.cache import TTLCache
 from app.schemas.stock import (
     HistoricalPricePoint,
     StockDetail,
     StockHistoryResponse,
     StockNewsItem,
     StockNewsResponse,
-    StockSentimentTrendPoint,
     StockSearchResult,
+    StockSentimentTrendPoint,
 )
-from app.core.config import get_settings
 from app.services import sentiment_service
+
+logger = logging.getLogger(__name__)
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 
@@ -37,6 +41,14 @@ COMPANY_SYMBOL_ALIASES = {
     "nvidia": "NVDA",
     "tesla": "TSLA",
 }
+
+# Yahoo Finance is slow and rate-limits aggressively, especially from cloud servers.
+_detail_cache = TTLCache(ttl_seconds=60)
+_market_stats_cache = TTLCache(ttl_seconds=30)
+_history_cache = TTLCache(ttl_seconds=15 * 60)
+_news_cache = TTLCache(ttl_seconds=10 * 60)
+_search_cache = TTLCache(ttl_seconds=60 * 60)
+INTRADAY_HISTORY_TTL_SECONDS = 60
 
 HISTORY_RANGES = {
     "1d": {"period": "1d", "interval": "5m"},
@@ -197,6 +209,7 @@ def _build_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
         ),
     }
 
+
 def _build_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
     normalized_ticker = normalize_ticker(ticker)
     history_config = HISTORY_RANGES[range_key]
@@ -269,7 +282,9 @@ def _build_stock_news_items(ticker: str, limit: int) -> list[StockNewsItem]:
                     or content.get("publisher")
                     or article.get("publisher")
                 ),
-                publish_date=_to_publish_date(content.get("pubDate") or article.get("providerPublishTime")),
+                publish_date=_to_publish_date(
+                    content.get("pubDate") or article.get("providerPublishTime")
+                ),
                 summary=content.get("summary") or article.get("summary"),
                 url=_extract_news_url(content, article),
             )
@@ -309,45 +324,76 @@ def _build_sentiment_trend(articles: list[StockNewsItem]) -> list[StockSentiment
             positive=int(values["Positive"]),
             neutral=int(values["Neutral"]),
             negative=int(values["Negative"]),
-            average_score=round(values["score_total"] / values["count"], 4) if values["count"] else 0.0,
+            average_score=round(values["score_total"] / values["count"], 4)
+            if values["count"]
+            else 0.0,
         )
         for day, values in sorted(grouped.items())
     ]
 
 
+async def _from_yahoo[T](func: Callable[..., T], *args: Any) -> T:
+    """Run a blocking yfinance call, turning network or parsing failures into a clean 502."""
+    try:
+        return await asyncio.to_thread(func, *args)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Yahoo Finance request failed in %s: %s", func.__name__, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The market data provider is unavailable right now. Please try again shortly.",
+        ) from exc
+
+
 async def get_stock_detail(ticker: str) -> StockDetail:
-    return await asyncio.to_thread(_build_stock_detail, ticker)
+    return await _detail_cache.get_or_set(
+        normalize_ticker(ticker), lambda: _from_yahoo(_build_stock_detail, ticker)
+    )
 
 
 async def get_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
-    return await asyncio.to_thread(_build_stock_market_stats, ticker)
+    return await _market_stats_cache.get_or_set(
+        normalize_ticker(ticker), lambda: _from_yahoo(_build_stock_market_stats, ticker)
+    )
 
 
 async def get_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
-    return await asyncio.to_thread(_build_stock_history, ticker, range_key)
+    return await _history_cache.get_or_set(
+        (normalize_ticker(ticker), range_key),
+        lambda: _from_yahoo(_build_stock_history, ticker, range_key),
+        INTRADAY_HISTORY_TTL_SECONDS if range_key == "1d" else None,
+    )
 
 
 async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
     normalized_ticker = normalize_ticker(ticker)
-    articles = await asyncio.to_thread(_build_stock_news_items, normalized_ticker, limit)
+    return await _news_cache.get_or_set(
+        (normalized_ticker, limit), lambda: _load_stock_news(normalized_ticker, limit)
+    )
 
-    enriched_articles: list[StockNewsItem] = []
-    for article in articles:
-        sentiment = await sentiment_service.analyze_sentiment(_build_sentiment_input(article))
-        enriched_articles.append(
-            article.model_copy(
-                update={
-                    "sentiment_label": sentiment.label,
-                    "sentiment_score": sentiment.score,
-                }
-            )
+
+async def _load_stock_news(normalized_ticker: str, limit: int) -> StockNewsResponse:
+    articles = await _from_yahoo(_build_stock_news_items, normalized_ticker, limit)
+
+    sentiments = await sentiment_service.analyze_sentiments(
+        [_build_sentiment_input(article) for article in articles]
+    )
+    enriched_articles = [
+        article.model_copy(
+            update={
+                "sentiment_label": sentiment.label,
+                "sentiment_score": sentiment.score,
+            }
         )
+        for article, sentiment in zip(articles, sentiments, strict=True)
+    ]
 
     return StockNewsResponse(
         ticker=normalized_ticker,
         articles=enriched_articles,
         sentiment_trend=_build_sentiment_trend(enriched_articles),
-        sentiment_model=get_settings().huggingface_sentiment_model,
+        sentiment_model=sentiment_service.sentiment_model_name(),
     )
 
 
@@ -413,10 +459,10 @@ def _search_stocks(query: str) -> list[StockSearchResult]:
 
 
 async def search_stocks(query: str) -> list[StockSearchResult]:
-    return await asyncio.to_thread(_search_stocks, query)
+    return await _search_cache.get_or_set(
+        query.strip().lower(), lambda: _from_yahoo(_search_stocks, query)
+    )
 
 
 async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:
     return await search_stocks(query)
-
-

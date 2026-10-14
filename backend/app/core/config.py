@@ -1,6 +1,8 @@
 import json
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,15 +11,15 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     backend_cors_origins: str = "http://localhost:3000"
-    database_url: str = "postgresql+asyncpg://stock_user:stock_password@localhost:5432/stock_intelligence"
+    database_url: str = (
+        "postgresql+asyncpg://stock_user:stock_password@localhost:5432/stock_intelligence"
+    )
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     auth_cookie_name: str = "access_token"
     auth_cookie_secure: bool = False
-    auto_create_tables: bool = False
-    huggingface_api_token: str | None = None
-    huggingface_sentiment_model: str = "ProsusAI/finbert"
+    demo_mode_enabled: bool = True
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     groq_api_key: str | None = None
@@ -28,9 +30,45 @@ class Settings(BaseSettings):
     ml_scheduler_enabled: bool = True
     ml_retrain_interval_days: int = 4
     ml_scheduler_initial_delay_seconds: int = 30
-    ml_models_dir: str = "models"
     ml_default_symbols: str = "AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM"
     ml_min_training_rows: int = 120
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_asyncpg_url(cls, value: str) -> str:
+        """Accept URLs as hosting providers show them (e.g. Neon, Render) and adapt for asyncpg."""
+        parts = urlsplit(value)
+        scheme = parts.scheme
+        if scheme in ("postgres", "postgresql"):
+            scheme = "postgresql+asyncpg"
+
+        query = []
+        for key, item in parse_qsl(parts.query):
+            if key == "sslmode":
+                # asyncpg spells this option "ssl".
+                query.append(("ssl", item))
+            elif key != "channel_binding":
+                # asyncpg does not accept channel_binding.
+                query.append((key, item))
+
+        return urlunsplit(parts._replace(scheme=scheme, query=urlencode(query)))
+
+    @model_validator(mode="after")
+    def _require_production_secrets(self) -> "Settings":
+        if self.app_env != "production":
+            return self
+
+        if len(self.jwt_secret_key) < 32 or self.jwt_secret_key.startswith(
+            ("change-me", "replace-with")
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a random value of at least 32 characters."
+            )
+
+        if not self.auth_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SECURE must be true in production.")
+
+        return self
 
     @property
     def cors_origins(self) -> list[str]:
@@ -44,7 +82,11 @@ class Settings(BaseSettings):
 
     @property
     def default_ml_symbols(self) -> list[str]:
-        return [symbol.strip().upper() for symbol in self.ml_default_symbols.split(",") if symbol.strip()]
+        return [
+            symbol.strip().upper()
+            for symbol in self.ml_default_symbols.split(",")
+            if symbol.strip()
+        ]
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
@@ -57,4 +99,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

@@ -1,3 +1,4 @@
+# ruff: noqa: F401 - compatibility module that re-exports app.market.* names.
 """Compatibility facade for market data services.
 
 New code should import from app.market.* modules directly. Existing routes and tests keep
@@ -14,6 +15,8 @@ from app.market.market_session import (
 )
 from app.market.rest_market_service import (
     enrich_with_yahoo_extended_hours as _enrich_with_yahoo_extended_hours,
+)
+from app.market.rest_market_service import (
     get_finnhub_quotes as _get_uncached_finnhub_quotes,
 )
 from app.market.websocket_service import stream_finnhub_trades

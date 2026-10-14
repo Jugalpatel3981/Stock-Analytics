@@ -11,10 +11,10 @@ from app.schemas.chat import (
     ChatExchangeResponse,
     ChatMessageCreate,
     ChatMessageRead,
-    ChatSourceRead,
     ChatSessionCreate,
     ChatSessionDetail,
     ChatSessionRead,
+    ChatSourceRead,
 )
 from app.services import openai_service, prediction_service, stock_service, tavily_service
 
@@ -35,7 +35,6 @@ class MarketContext:
     context: str
     sources: list[ChatSourceRead]
     symbols: list[str]
-    confidence_score: int
 
 
 def _session_to_read(session: ChatSession) -> ChatSessionRead:
@@ -59,7 +58,6 @@ def _message_to_read(
         content=message.content,
         created_at=message.created_at,
         stock_symbol=stock_symbol,
-        confidence_score=85 if message.role == "assistant" and source_list else None,
         sources=source_list,
     )
 
@@ -71,8 +69,19 @@ def _build_title(content: str) -> str:
 
 def _is_prediction_question(content: str) -> bool:
     lowered_content = content.lower()
-    prediction_terms = ("prediction", "predict", "bullish", "bearish", "model", "expects", "expected", "increase", "decrease")
+    prediction_terms = (
+        "prediction",
+        "predict",
+        "bullish",
+        "bearish",
+        "model",
+        "expects",
+        "expected",
+        "increase",
+        "decrease",
+    )
     return any(term in lowered_content for term in prediction_terms)
+
 
 def _extract_tickers(content: str) -> list[str]:
     explicit_tickers = set(re.findall(r"\$([A-Za-z]{1,5})\b", content))
@@ -207,6 +216,7 @@ async def delete_session(
     await session.delete(chat_session)
     await session.commit()
 
+
 def _source_line(source: ChatSourceRead, detail: str | None = None) -> str:
     suffix = f" | Detail: {detail}" if detail else ""
     return (
@@ -216,6 +226,7 @@ def _source_line(source: ChatSourceRead, detail: str | None = None) -> str:
 
 
 async def _build_market_context(
+    session: AsyncSession,
     content: str,
     fallback_symbols: list[str] | None = None,
 ) -> MarketContext:
@@ -231,7 +242,10 @@ async def _build_market_context(
                     [
                         f"Stock: {detail.ticker}",
                         f"Company: {detail.company_name or 'Unavailable'}",
-                        f"Current price: {detail.current_price or 'Unavailable'} {detail.currency or ''}",
+                        (
+                            f"Current price: {detail.current_price or 'Unavailable'} "
+                            f"{detail.currency or ''}"
+                        ),
                         f"Volume: {detail.volume or 'Unavailable'}",
                         f"Market cap: {detail.market_cap or 'Unavailable'}",
                         f"P/E ratio: {detail.pe_ratio or 'Unavailable'}",
@@ -242,7 +256,9 @@ async def _build_market_context(
             context_sections.append(f"Stock: {ticker}\nCompany data unavailable.")
 
         if _is_prediction_question(content):
-            prediction_context = await prediction_service.get_prediction_explanation_context(session, ticker)
+            prediction_context = await prediction_service.get_prediction_explanation_context(
+                session, ticker
+            )
             context_sections.append(f"Prediction context for {ticker}:\n{prediction_context}")
 
         try:
@@ -290,18 +306,18 @@ async def _build_market_context(
 
     if not context_sections:
         return MarketContext(
-            context="No specific ticker was detected. Ask the user for the company or ticker before analyzing.",
+            context=(
+                "No specific ticker was detected. "
+                "Ask the user for the company or ticker before analyzing."
+            ),
             sources=[],
             symbols=[],
-            confidence_score=30,
         )
 
-    confidence_score = 85 if sources else 55
     return MarketContext(
         context="\n\n".join(context_sections),
         sources=sources[:12],
         symbols=tickers,
-        confidence_score=confidence_score,
     )
 
 
@@ -393,5 +409,5 @@ async def create_message_exchange(
         assistant_message=_message_to_read(
             assistant_message,
             market_context.sources,
-        ).model_copy(update={"confidence_score": market_context.confidence_score}),
+        ),
     )

@@ -29,6 +29,7 @@ class PortfolioSummary(BaseModel):
     total_cost: float
     total_gain_loss: float
     total_percentage_return: float
+    unpriced_holdings: int = 0
     holdings: list[PortfolioHoldingRead]
 
 

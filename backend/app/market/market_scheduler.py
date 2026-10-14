@@ -1,6 +1,6 @@
 import asyncio
-from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 from app.schemas.market import MarketQuote
 
@@ -24,7 +24,6 @@ class MarketStatsScheduler:
         fetcher: Callable[[list[str]], Awaitable[list[MarketQuote]]],
     ) -> list[MarketQuote]:
         async with self._lock:
-            now = datetime.now(UTC)
             quotes_by_symbol: dict[str, MarketQuote] = {}
             stale_symbols: list[str] = []
 

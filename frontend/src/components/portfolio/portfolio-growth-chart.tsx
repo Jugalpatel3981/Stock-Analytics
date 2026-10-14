@@ -34,7 +34,7 @@ export function PortfolioGrowthChart({ points }: PortfolioGrowthChartProps) {
     <div className="h-[320px] rounded-md border bg-background/30 p-3">
       {chartData.length === 0 ? (
         <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-          Add holdings to generate a portfolio growth chart.
+          No price history yet. The chart appears once holdings have closing prices.
         </div>
       ) : (
         <ResponsiveContainer width="100%" height="100%">

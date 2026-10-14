@@ -123,15 +123,22 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
       percentage_return: percentageReturn,
     };
   });
-  const liveTotalValue = liveHoldings.reduce((total, holding) => total + (holding.current_value ?? 0), 0);
-  const liveTotalGainLoss = liveTotalValue - summary.total_cost;
-  const liveTotalReturn = summary.total_cost ? (liveTotalGainLoss / summary.total_cost) * 100 : 0;
+  // Totals only include holdings with a known price, so a data outage is not shown as a loss.
+  const pricedHoldings = liveHoldings.filter((holding) => holding.current_value !== null);
+  const unpricedCount = liveHoldings.length - pricedHoldings.length;
+  const hasPrices = pricedHoldings.length > 0;
+  const liveTotalValue = pricedHoldings.reduce((total, holding) => total + (holding.current_value ?? 0), 0);
+  const pricedCost = pricedHoldings.reduce((total, holding) => total + holding.cost_basis, 0);
+  const totalCost = liveHoldings.reduce((total, holding) => total + holding.cost_basis, 0);
+  const liveTotalGainLoss = liveTotalValue - pricedCost;
+  const liveTotalReturn = pricedCost ? (liveTotalGainLoss / pricedCost) * 100 : 0;
+  const unavailable = "Unavailable";
 
   const statCards = [
-    { label: "Current Value", value: formatCurrency(liveTotalValue) },
-    { label: "Cost Basis", value: formatCurrency(summary.total_cost) },
-    { label: "Gain/Loss", value: formatCurrency(liveTotalGainLoss) },
-    { label: "Return", value: formatPercent(liveTotalReturn) },
+    { label: "Current Value", value: hasPrices ? formatCurrency(liveTotalValue) : unavailable },
+    { label: "Cost Basis", value: formatCurrency(totalCost) },
+    { label: "Gain/Loss", value: hasPrices ? formatCurrency(liveTotalGainLoss) : unavailable },
+    { label: "Return", value: hasPrices ? formatPercent(liveTotalReturn) : unavailable },
   ];
 
   return (
@@ -144,6 +151,12 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
           </div>
         ))}
       </div>
+      {unpricedCount > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {unpricedCount} of {liveHoldings.length} holdings have no current price yet, so they are left out of the
+          value and return totals.
+        </p>
+      ) : null}
 
       <section className="rounded-lg border bg-card/80 p-5">
         <div className="mb-4">

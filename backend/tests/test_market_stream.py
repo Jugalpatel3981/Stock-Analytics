@@ -2,9 +2,12 @@ from datetime import datetime
 
 from fastapi.testclient import TestClient
 
-from app.core.security import create_access_token
+from app.core.security import create_access_token, create_stream_token
 from app.main import app
-from app.market.rest_market_service import _stats_from_candle_payload, enrich_with_yahoo_market_stats
+from app.market.rest_market_service import (
+    _stats_from_candle_payload,
+    enrich_with_yahoo_market_stats,
+)
 from app.schemas.market import MarketQuote
 from app.services.market_stream_service import (
     _enrich_with_yahoo_extended_hours,
@@ -12,7 +15,6 @@ from app.services.market_stream_service import (
     get_market_session,
     normalize_symbols,
 )
-
 
 client = TestClient(app)
 
@@ -48,6 +50,36 @@ def test_market_stream_requires_symbols_after_authentication() -> None:
     assert payload["message"] == "At least one symbol is required."
 
 
+def test_market_stream_accepts_stream_token_in_url() -> None:
+    token = create_stream_token(subject="123")
+
+    with client.websocket_connect(f"/api/v1/market/stream?symbols=&token={token}") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["message"] == "At least one symbol is required."
+
+
+def test_market_stream_rejects_regular_access_token_in_url() -> None:
+    token = create_access_token(subject="123")
+
+    with client.websocket_connect(f"/api/v1/market/stream?symbols=NVDA&token={token}") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["message"] == "Invalid stream token."
+
+
+def test_stream_token_cannot_be_used_for_api_requests() -> None:
+    token = create_stream_token(subject="123")
+
+    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
+def test_stream_token_endpoint_requires_authentication() -> None:
+    assert client.get("/api/v1/market/stream-token").status_code == 401
+
+
 def test_market_session_detects_regular_market_open() -> None:
     session, next_open = get_market_session(datetime.fromisoformat("2026-06-12T14:00:00+00:00"))
 
@@ -79,6 +111,7 @@ def test_after_hours_without_extended_activity_uses_current_price_as_regular_clo
 
     assert regular_price == 234.11
     assert extended_hours_price is None
+
 
 def test_yahoo_extended_hours_fallback_enriches_after_hours_quote() -> None:
     quote = MarketQuote(
@@ -135,6 +168,7 @@ def test_yahoo_extended_hours_fallback_keeps_waiting_quote_without_extended_pric
     assert enriched_quote.has_extended_hours_activity is False
     assert enriched_quote.extended_hours_status == "WAITING"
 
+
 def test_market_stats_sums_intraday_volume_and_ohlc() -> None:
     stats = _stats_from_candle_payload(
         {
@@ -150,6 +184,7 @@ def test_market_stats_sums_intraday_volume_and_ohlc() -> None:
     assert stats["high"] == 104.5
     assert stats["low"] == 99.0
     assert stats["volume"] == 6500
+
 
 def test_yahoo_market_stats_fallback_fills_volume_and_day_stats() -> None:
     quote = MarketQuote(

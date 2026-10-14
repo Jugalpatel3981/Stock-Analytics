@@ -33,9 +33,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-access_token}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
-      AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
-      HUGGINGFACE_API_TOKEN: ${HUGGINGFACE_API_TOKEN:-}
-      HUGGINGFACE_SENTIMENT_MODEL: ${HUGGINGFACE_SENTIMENT_MODEL:-ProsusAI/finbert}
+      DEMO_MODE_ENABLED: ${DEMO_MODE_ENABLED:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
@@ -45,8 +43,6 @@ services:
       TAVILY_SEARCH_DEPTH: ${TAVILY_SEARCH_DEPTH:-basic}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - backend-models:/app/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,13 +58,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+        BACKEND_URL: http://backend:8000
         NEXT_PUBLIC_MARKET_STREAM_URL: ${NEXT_PUBLIC_MARKET_STREAM_URL:-ws://localhost:8000/api/v1/market/stream}
     container_name: ai-stock-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
-      API_INTERNAL_BASE_URL: http://backend:8000/api/v1
+      BACKEND_URL: http://backend:8000
       NEXT_PUBLIC_MARKET_STREAM_URL: ${NEXT_PUBLIC_MARKET_STREAM_URL:-ws://localhost:8000/api/v1/market/stream}
     ports:
       - "3000:3000"
@@ -84,7 +79,6 @@ services:
 
 volumes:
   postgres-data:
-  backend-models:
 
 
 

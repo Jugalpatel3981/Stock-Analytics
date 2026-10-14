@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import suppress
+from datetime import timedelta
 
 from app.core.config import Settings
 from app.core.database import async_session_factory
+from app.ml import registry
 from app.ml.symbols import get_tracked_symbols
 from app.ml.trainer import train_model_for_ticker
 from app.ml.training_queue import get_training_queue, mark_training_symbol_complete
@@ -30,7 +32,9 @@ class MLPipelineScheduler:
             self._task = asyncio.create_task(self._run_loop(), name="ml-pipeline-scheduler")
 
         if self._queue_task is None or self._queue_task.done():
-            self._queue_task = asyncio.create_task(self._run_on_demand_queue(), name="ml-on-demand-training-queue")
+            self._queue_task = asyncio.create_task(
+                self._run_on_demand_queue(), name="ml-on-demand-training-queue"
+            )
 
         logger.info("ML scheduler started.")
 
@@ -67,7 +71,9 @@ class MLPipelineScheduler:
         while not self._stop_event.is_set():
             get_task = asyncio.create_task(queue.get())
             stop_task = asyncio.create_task(self._stop_event.wait())
-            done, pending = await asyncio.wait({get_task, stop_task}, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                {get_task, stop_task}, return_when=asyncio.FIRST_COMPLETED
+            )
 
             for task in pending:
                 task.cancel()
@@ -101,7 +107,14 @@ class MLPipelineScheduler:
         async with async_session_factory() as session:
             symbols = await get_tracked_symbols(session)
 
+        max_age = timedelta(days=max(1, self.settings.ml_retrain_interval_days))
         for symbol in symbols:
+            async with async_session_factory() as session:
+                production_record = await registry.get_production_model_record(session, symbol)
+            if registry.is_model_fresh(production_record, max_age):
+                logger.info("Skipping %s: production model is newer than %s.", symbol, max_age)
+                continue
+
             await self._train_symbol(symbol)
 
         logger.info("ML pipeline run finished for %s symbols.", len(symbols))

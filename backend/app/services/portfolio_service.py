@@ -13,18 +13,22 @@ from app.schemas.portfolio import (
     PortfolioHoldingRead,
     PortfolioSummary,
 )
-from app.services import stock_service
+from app.services import market_stream_service, stock_service
 
 
 def normalize_symbol(symbol: str) -> str:
     return symbol.strip().upper()
 
 
-def build_holding_read(holding: PortfolioHolding, current_price: float | None) -> PortfolioHoldingRead:
+def build_holding_read(
+    holding: PortfolioHolding, current_price: float | None
+) -> PortfolioHoldingRead:
     cost_basis = holding.quantity * holding.buy_price
     current_value = holding.quantity * current_price if current_price is not None else None
     gain_loss = current_value - cost_basis if current_value is not None else None
-    percentage_return = (gain_loss / cost_basis) * 100 if gain_loss is not None and cost_basis > 0 else None
+    percentage_return = (
+        (gain_loss / cost_basis) * 100 if gain_loss is not None and cost_basis > 0 else None
+    )
 
     return PortfolioHoldingRead(
         id=holding.id,
@@ -51,6 +55,14 @@ async def list_raw_holdings(session: AsyncSession, user_id: int) -> list[Portfol
 
 
 async def get_current_price(symbol: str) -> float | None:
+    """Latest price from Finnhub when configured (reliable from cloud hosts), else Yahoo."""
+    try:
+        quotes = await market_stream_service.get_finnhub_quotes([symbol])
+        if quotes and quotes[0].current_price:
+            return quotes[0].current_price
+    except Exception:  # missing key or Finnhub outage: fall back to Yahoo
+        pass
+
     try:
         detail = await stock_service.get_stock_detail(symbol)
     except HTTPException:
@@ -67,8 +79,12 @@ async def get_portfolio_summary(session: AsyncSession, user_id: int) -> Portfoli
         current_price = await get_current_price(holding.symbol)
         enriched_holdings.append(build_holding_read(holding, current_price))
 
-    total_cost = sum(holding.cost_basis for holding in enriched_holdings)
-    total_value = sum(holding.current_value or 0 for holding in enriched_holdings)
+    # Totals cover holdings with a known price, so a provider outage does not look like a loss.
+    priced_holdings = [
+        holding for holding in enriched_holdings if holding.current_value is not None
+    ]
+    total_cost = sum(holding.cost_basis for holding in priced_holdings)
+    total_value = sum(holding.current_value or 0 for holding in priced_holdings)
     total_gain_loss = total_value - total_cost
     total_percentage_return = (total_gain_loss / total_cost) * 100 if total_cost > 0 else 0
 
@@ -77,6 +93,7 @@ async def get_portfolio_summary(session: AsyncSession, user_id: int) -> Portfoli
         total_cost=total_cost,
         total_gain_loss=total_gain_loss,
         total_percentage_return=total_percentage_return,
+        unpriced_holdings=len(enriched_holdings) - len(priced_holdings),
         holdings=enriched_holdings,
     )
 

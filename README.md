@@ -1,244 +1,209 @@
-﻿# AI Stock Intelligence Platform
+﻿<div align="center">
 
-AI Stock Intelligence Platform is a full-stack portfolio project for stock research, portfolio tracking, market news, AI sentiment analysis, AI-assisted financial research, and experimental price prediction.
+# AI Stock Intelligence Platform
 
-It is built as a production-minded monorepo with a Next.js frontend, FastAPI backend, PostgreSQL database, Docker support, CI checks, and deployment preparation for Vercel and Railway.
+**Live prices, AI-powered research and honestly backtested predictions in one dashboard.**
 
-> This platform provides informational research support only. It does not provide financial advice, buy/sell recommendations, guarantees, or price targets.
+[![CI](https://github.com/Jugalpatel3981/ai-stock-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Jugalpatel3981/ai-stock-intelligence-platform/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+<!-- LIVE-DEMO-LINK: added after deployment -->
+
+![Dashboard](screenshots/dashboard.png)
+
+</div>
+
+## Overview
+
+A full-stack web app for researching US stocks. Search any ticker, follow it with real-time
+prices, read the latest news with AI sentiment, ask an AI assistant that cites its sources,
+track a portfolio, and see a next-day forecast together with the model's real track record.
+
+> For informational and educational purposes only. Not financial advice.
 
 ## Features
 
-- JWT authentication with HttpOnly cookie sessions
-- Professional dark finance dashboard
-- Stock search and stock detail pages
-- Yahoo Finance company data and historical prices
-- Recharts price visualization
-- Watchlists
-- Portfolio holdings, gain/loss, and growth chart
-- Finnhub WebSocket-powered live prices for dashboard, stocks, watchlists, and portfolio
-- Stock news filtered by ticker
-- HuggingFace-powered news sentiment analysis
-- OpenAI-powered financial assistant with saved chat history, follow-up support, web research, and source citations
-- XGBoost next-day close prediction module
-- Dockerized frontend, backend, and PostgreSQL
-- GitHub Actions CI
-- Deployment guides for Vercel and Railway
+| | Feature | How it works |
+| --- | --- | --- |
+| 📈 | **Real-time prices** | The backend proxies Finnhub's WebSocket to the browser and labels pre-market, regular and after-hours sessions. |
+| 🤖 | **AI research assistant** | Answers combine price data, news, sentiment and Tavily web search. Every answer lists its sources. |
+| 📰 | **News sentiment** | Headlines are classified by an LLM (Groq) in a single batched call and cached, so each article is analysed once. |
+| 🧠 | **Backtested predictions** | XGBoost predicts the next-day return. Each prediction shows walk-forward accuracy against simple baselines. |
+| 💼 | **Portfolio and watchlists** | Live gain/loss, a portfolio growth chart, and multiple watchlists. |
+| 🔐 | **Secure accounts** | bcrypt passwords and JWT sessions in HttpOnly cookies, plus a one-click demo account. |
+| ⚙️ | **Production engineering** | Background retraining, models stored in PostgreSQL, Alembic migrations, caching, rate limiting and CI. |
 
-## Tech Stack
+## Screenshots
 
-| Layer | Technology |
+| Stock detail | AI assistant |
 | --- | --- |
-| Frontend | Next.js 15, TypeScript, Tailwind CSS, ShadCN UI conventions |
-| Backend | FastAPI, Python 3.12, Pydantic Settings |
-| Database | PostgreSQL, SQLAlchemy async |
-| AI | OpenAI/Grok Responses APIs, HuggingFace sentiment model, Tavily Search |
-| Market Data | Yahoo Finance, Finnhub WebSocket |
-| ML | XGBoost, pandas, numpy, scikit-learn |
-| Charts | Recharts |
-| Infrastructure | Docker, Docker Compose |
-| CI | GitHub Actions |
+| ![Stock detail page with live price and chart](screenshots/stock-detail.png) | ![AI assistant answer with cited sources](screenshots/assistant.png) |
+| **Prediction with backtest** | **News and sentiment** |
+| ![Prediction card with track record](screenshots/prediction.png) | ![News feed with sentiment labels and trend](screenshots/news.png) |
+| **Portfolio** | **Landing page** |
+| ![Portfolio holdings and growth chart](screenshots/portfolio.png) | ![Landing page with demo login](screenshots/landing.png) |
 
-## Repository Structure
+## Architecture
 
-```text
-.
-|-- backend/                 # FastAPI application
-|   |-- app/
-|   |   |-- api/             # API routers and dependencies
-|   |   |-- core/            # Settings and database infrastructure
-|   |   |-- models/          # SQLAlchemy models
-|   |   |-- schemas/         # Pydantic schemas
-|   |   |-- scripts/         # Utility scripts
-|   |   `-- services/        # Business logic and integrations
-|   `-- tests/               # Backend tests
-|-- docs/                    # Phase docs and deployment guides
-|-- frontend/                # Next.js application
-|   `-- src/
-|       |-- app/             # App Router pages
-|       |-- components/      # Reusable UI and feature components
-|       `-- lib/             # API client and utilities
-|-- docker-compose.yml       # Local development stack
-|-- docker-compose.prod.yml  # Future production Compose template
-`-- .github/workflows/       # CI workflow
+```mermaid
+flowchart LR
+    UI[Next.js frontend] -->|REST + HttpOnly cookie| API[FastAPI backend]
+    UI <-->|live ticks| WS[WebSocket proxy]
+    WS <--> Finnhub[[Finnhub]]
+    API --> Yahoo[[Yahoo Finance]]
+    API --> Groq[[Groq LLM]]
+    API --> Tavily[[Tavily]]
+    API --> DB[(PostgreSQL)]
+    Scheduler[ML scheduler] --> DB
 ```
 
-## Prerequisites
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design: auth, market data
+flow, the AI assistant and the ML pipeline.
 
-- Node.js 22+
-- Python 3.12+
-- Docker Desktop
-- Git
+## Tech stack
 
-## Quick Start With Docker
+| Layer | Technologies |
+| --- | --- |
+| Frontend | Next.js 15 (App Router), React, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
+| Backend | FastAPI, Python 3.12, SQLAlchemy 2 (async), Pydantic, WebSockets |
+| Data and ML | PostgreSQL, pandas, NumPy, XGBoost, yfinance |
+| AI | Groq (Llama 3.3 70B), Tavily search |
+| Market data | Finnhub WebSocket and REST, Yahoo Finance |
+| DevOps | Docker, Docker Compose, Alembic, GitHub Actions, Render, Vercel, Neon |
 
-1. Copy environment defaults:
+## Prediction model: honest evaluation
 
-```powershell
-Copy-Item .env.example .env
-```
+Most stock-prediction demos report a "98% accuracy" that comes from scoring tomorrow's
+*price*, which is almost the same as today's. This project measures what matters:
 
-2. Start the stack:
+- **Target:** the next-day *return*, predicted from 19 scale-free technical features.
+- **Validation:** expanding-window walk-forward, so every test prediction comes from a model
+  trained only on earlier data. There is no look-ahead bias.
+- **Baselines:** the naive "tomorrow = today" forecast for price error, and always guessing
+  the most common direction for accuracy.
+- **Strategy check:** holding only on predicted up-days, compared with buy-and-hold.
 
-```powershell
+The results are in **[docs/model-performance.md](docs/model-performance.md)**. They are
+generated by `python -m app.ml.backtest` or the *Model Backtest* GitHub Action. As expected
+for daily returns, the edge over the baselines is small, and the app says so next to every
+prediction instead of showing a made-up confidence score.
+
+## Getting started
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Free API keys:
+
+| Key | Used for | Required? |
+| --- | --- | --- |
+| `GROQ_API_KEY` ([console.groq.com](https://console.groq.com)) | AI assistant and news sentiment | Recommended |
+| `FINNHUB_API_KEY` ([finnhub.io](https://finnhub.io)) | Real-time prices | Recommended |
+| `TAVILY_API_KEY` ([tavily.com](https://tavily.com)) | Web research in the assistant | Optional |
+
+The app still runs without keys. Those features show a clear "not configured" message.
+
+### Run with Docker
+
+```bash
+git clone https://github.com/Jugalpatel3981/ai-stock-intelligence-platform.git
+cd ai-stock-intelligence-platform
+cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
+# Add your API keys to .env
 docker compose up --build
 ```
 
-3. Open the app:
+Open **http://localhost:3000** and click **Try the live demo**.
 
-```text
-http://localhost:3000
-```
+| Service | URL |
+| --- | --- |
+| Frontend | http://localhost:3000 |
+| API docs (Swagger) | http://localhost:8000/docs |
+| Health check | http://localhost:8000/health |
 
-Useful URLs:
+### Deploy for free
 
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
-- Backend docs: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
+The live demo runs on Vercel, Render and Neon free tiers. See
+**[docs/deployment.md](docs/deployment.md)** for a 15-minute walkthrough.
 
-## Local Development Without Docker
+<details>
+<summary><b>Run without Docker</b></summary>
 
-Backend:
+You need Python 3.12+, Node.js 22+ and a local PostgreSQL database.
 
-```powershell
+```bash
+# Backend
 cd backend
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+cp .env.example .env               # set DATABASE_URL and your API keys
+python -m app.scripts.init_db
 uvicorn app.main:app --reload
-```
 
-Frontend:
-
-```powershell
+# Frontend (in a second terminal, from the repository root)
 npm install
 npm run dev:frontend
 ```
 
-Database initialization:
-
-```powershell
-cd backend
-python -m app.scripts.init_db
-```
-
-## Environment Variables
-
-Copy the examples before local development:
-
-```powershell
-Copy-Item .env.example .env
-Copy-Item backend/.env.example backend/.env
-Copy-Item frontend/.env.example frontend/.env.local
-```
-
-Detailed environment documentation:
-
-- [Environment Variables](docs/environment-variables.md)
-- Production template: `.env.production.example`
-
-Optional AI variables:
-
-```text
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4.1-mini
-GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
-HUGGINGFACE_API_TOKEN=
-HUGGINGFACE_SENTIMENT_MODEL=ProsusAI/finbert
-TAVILY_API_KEY=
-TAVILY_SEARCH_DEPTH=basic
-FINNHUB_API_KEY=
-NEXT_PUBLIC_MARKET_STREAM_URL=ws://localhost:8000/api/v1/market/stream
-```
+</details>
 
 ## Testing
 
-Backend:
+```bash
+# From the backend directory
+pytest                     # tests
+ruff check .               # lint
 
-```powershell
-cd backend
-pytest
+# From the repository root
+npm run lint:frontend      # ESLint
+npm run typecheck:frontend # TypeScript
 ```
 
-Frontend:
+CI runs all of these, plus a production frontend build and Docker image builds, on every push.
 
-```powershell
-npm run lint:frontend
+## Project structure
+
+```text
+.
+├── backend/
+│   ├── app/
+│   │   ├── api/          # FastAPI routers and dependencies
+│   │   ├── core/         # Settings, database, security
+│   │   ├── market/       # Finnhub streaming, market sessions, quote cache
+│   │   ├── ml/           # Features, training, evaluation, registry, scheduler, backtest
+│   │   ├── models/       # SQLAlchemy tables
+│   │   ├── schemas/      # Pydantic models
+│   │   └── services/     # Business logic and integrations
+│   └── tests/
+├── frontend/src/
+│   ├── app/              # Next.js routes
+│   ├── components/       # UI and feature components
+│   └── lib/              # API client and helpers
+├── docs/                 # Architecture, model performance, environment variables
+└── .github/workflows/    # CI and model backtest
 ```
 
-Docker build checks are included in GitHub Actions.
+## API overview
 
-## Main Routes
+Interactive docs are available at `/docs` when the backend is running.
 
-| Route | Purpose |
+| Area | Endpoints |
 | --- | --- |
-| `/login` | User login |
-| `/register` | User registration |
-| `/dashboard` | Finance dashboard |
-| `/stocks` | Stock search |
-| `/stocks/[ticker]` | Stock detail and price chart |
-| `/watchlists` | Watchlist management |
-| `/portfolio` | Portfolio holdings and growth |
-| `/news` | Stock news and sentiment |
-| `/assistant` | AI financial assistant |
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/demo`, `GET /auth/me` |
+| Stocks | `GET /stocks/search`, `GET /stocks/{ticker}`, `GET /stocks/{ticker}/history` |
+| News | `GET /stocks/news?ticker=NVDA` |
+| Prediction | `GET /stocks/{ticker}/prediction` |
+| Market | `GET /market/quotes?symbols=NVDA,AAPL`, `WS /market/stream?symbols=NVDA,AAPL` |
+| Watchlists | `GET /watchlists`, `POST /watchlists`, `POST /watchlists/{id}/stocks` |
+| Portfolio | `GET /portfolio/holdings`, `GET /portfolio/growth` |
+| Assistant | `GET /chat/sessions`, `POST /chat/sessions/{id}/messages` |
 
-## API Overview
-
-| Area | Endpoint Examples |
-| --- | --- |
-| Auth | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me` |
-| Stocks | `GET /api/v1/stocks/search?query=NVDA`, `GET /api/v1/stocks/NVDA` |
-| History | `GET /api/v1/stocks/NVDA/history?range=1mo` |
-| News | `GET /api/v1/stocks/news?ticker=NVDA` |
-| Prediction | `GET /api/v1/stocks/NVDA/prediction` |
-| Market Snapshot | `GET /api/v1/market/quotes?symbols=NVDA,AAPL` |
-| Live Market Stream | `WS /api/v1/market/stream?symbols=NVDA,AAPL` |
-| Watchlists | `GET /api/v1/watchlists`, `POST /api/v1/watchlists` |
-| Portfolio | `GET /api/v1/portfolio/holdings`, `GET /api/v1/portfolio/growth` |
-| Assistant | `GET /api/v1/chat/sessions`, `POST /api/v1/chat/sessions/{id}/messages` |
-
-## Deployment Preparation
-
-No deployment has been performed yet. The repository is prepared for future deployment.
-
-Guides:
-
-- [Vercel Deployment Guide](docs/deployment-vercel.md)
-- [Railway Deployment Guide](docs/deployment-railway.md)
-
-Deployment-related files:
-
-- `backend/Dockerfile`
-- `frontend/Dockerfile`
-- `docker-compose.yml`
-- `docker-compose.prod.yml`
-- `.env.production.example`
-- `railway.backend.toml`
-- `railway.frontend.toml`
-- `.github/workflows/ci.yml`
-
-## Production Notes
-
-Before deploying for real:
-
-- Set strong secrets.
-- Use HTTPS URLs.
-- Set `AUTH_COOKIE_SECURE=true`.
-- Set `AUTO_CREATE_TABLES=false`.
-- Add the frontend domain to `BACKEND_CORS_ORIGINS`.
-- Configure a managed PostgreSQL database.
-- Run database initialization or migrations once.
-- Verify OpenAI and HuggingFace keys if using AI features.
-
-## Documentation
-
-Phase documentation is available in `docs/`:
-
-- `docs/phase-1.md`
-- `docs/phase-3.md` through `docs/phase-13.md`
+All paths are prefixed with `/api/v1`.
 
 ## License
 
-Portfolio project. Add a license before public production release if needed.
-
+[MIT](LICENSE)

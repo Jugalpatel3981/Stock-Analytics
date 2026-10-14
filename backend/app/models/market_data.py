@@ -8,7 +8,9 @@ from app.models.base import Base
 
 class HistoricalPrice(Base):
     __tablename__ = "historical_prices"
-    __table_args__ = (UniqueConstraint("ticker", "price_date", name="uq_historical_price_ticker_date"),)
+    __table_args__ = (
+        UniqueConstraint("ticker", "price_date", name="uq_historical_price_ticker_date"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String(12), nullable=False, index=True)

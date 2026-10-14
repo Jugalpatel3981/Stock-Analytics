@@ -125,15 +125,21 @@ export function DashboardMetrics() {
         totalValue: 0,
         todayGain: 0,
         todayGainPercent: 0,
+        hasPrices: false,
       };
     }
 
     let totalValue = 0;
     let todayGain = 0;
+    let pricedCount = 0;
 
     for (const holding of portfolio.holdings) {
       const quote = quotes[holding.symbol];
-      const livePrice = quote?.price ?? holding.current_price ?? 0;
+      const livePrice = quote?.price ?? holding.current_price;
+      if (livePrice === null) {
+        continue;
+      }
+      pricedCount += 1;
       totalValue += livePrice * holding.quantity;
 
       if (quote?.change !== null && quote?.change !== undefined) {
@@ -144,7 +150,7 @@ export function DashboardMetrics() {
     const previousValue = totalValue - todayGain;
     const todayGainPercent = previousValue > 0 ? (todayGain / previousValue) * 100 : 0;
 
-    return { totalValue, todayGain, todayGainPercent };
+    return { totalValue, todayGain, todayGainPercent, hasPrices: pricedCount > 0 };
   }, [portfolio, quotes]);
 
   const marketOverview = getMarketOverview(
@@ -156,8 +162,16 @@ export function DashboardMetrics() {
   const metrics = [
     {
       title: "Portfolio Value",
-      value: isLoading ? "Loading..." : formatCurrency(livePortfolio.totalValue),
-      change: portfolio?.holdings.length ? `${formatSignedCurrency(portfolio.total_gain_loss)} total return` : "Add holdings to track value",
+      value: isLoading
+        ? "Loading..."
+        : portfolio?.holdings.length && !livePortfolio.hasPrices
+          ? "Unavailable"
+          : formatCurrency(livePortfolio.totalValue),
+      change: !portfolio?.holdings.length
+        ? "Add holdings to track value"
+        : livePortfolio.hasPrices
+          ? `${formatSignedCurrency(portfolio.total_gain_loss)} total return`
+          : "Waiting for prices",
       trend: portfolio && portfolio.total_gain_loss > 0 ? "up" as const : portfolio && portfolio.total_gain_loss < 0 ? "down" as const : "neutral" as const,
       icon: BriefcaseBusiness,
     },

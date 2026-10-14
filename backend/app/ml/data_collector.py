@@ -46,7 +46,11 @@ def _download_history(ticker: str, period: str = "5y") -> list[dict[str, Any]]:
         if None in (open_price, high_price, low_price, close_price, adjusted_close):
             continue
 
-        price_date = timestamp.date() if hasattr(timestamp, "date") else date.fromisoformat(str(timestamp)[:10])
+        price_date = (
+            timestamp.date()
+            if hasattr(timestamp, "date")
+            else date.fromisoformat(str(timestamp)[:10])
+        )
         rows.append(
             {
                 "ticker": ticker,

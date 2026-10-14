@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { WatchlistManager } from "@/components/watchlists/watchlist-manager";
 import { getAuthCookieHeader, requireAuthenticatedUser } from "@/lib/auth-server";
 import type { Watchlist } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/env";
+
+export const metadata: Metadata = { title: "Watchlists" };
 
 async function getWatchlists(): Promise<Watchlist[]> {
   const cookieHeader = await getAuthCookieHeader();
