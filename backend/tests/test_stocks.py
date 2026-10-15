@@ -318,3 +318,21 @@ async def test_portfolio_price_is_none_when_provider_is_down(monkeypatch) -> Non
     monkeypatch.setattr(stock_service, "_build_stock_detail", unreachable)
 
     assert await portfolio_service.get_current_price("NVDA") is None
+
+
+async def test_slow_yahoo_calls_time_out(monkeypatch) -> None:
+    import time
+
+    import pytest
+    from fastapi import HTTPException
+
+    def slow(_ticker: str):
+        time.sleep(1)
+
+    monkeypatch.setattr(stock_service, "YAHOO_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(stock_service, "_build_stock_detail", slow)
+
+    with pytest.raises(HTTPException) as caught:
+        await stock_service.get_stock_detail("NVDA")
+
+    assert caught.value.status_code == 504

@@ -7,6 +7,15 @@ import { getApiBaseUrl } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Portfolio" };
 
+const EMPTY_SUMMARY: PortfolioSummary = {
+  total_value: 0,
+  total_cost: 0,
+  total_gain_loss: 0,
+  total_percentage_return: 0,
+  unpriced_holdings: 0,
+  holdings: [],
+};
+
 async function getPortfolioSummary(): Promise<PortfolioSummary> {
   const cookieHeader = await getAuthCookieHeader();
   const response = await fetch(`${getApiBaseUrl()}/portfolio/holdings`, {
@@ -41,10 +50,15 @@ async function getPortfolioGrowth(): Promise<PortfolioGrowthResponse> {
 
 export default async function PortfolioPage() {
   const user = await requireAuthenticatedUser();
-  const [summary, growth] = await Promise.all([
+  // Market data can be slow on free hosting. Render the page anyway and let the
+  // client retry whatever failed, instead of showing a full-page error.
+  const [summaryResult, growthResult] = await Promise.allSettled([
     getPortfolioSummary(),
     getPortfolioGrowth(),
   ]);
+  const summary = summaryResult.status === "fulfilled" ? summaryResult.value : EMPTY_SUMMARY;
+  const growth = growthResult.status === "fulfilled" ? growthResult.value.points : [];
+  const needsReload = summaryResult.status === "rejected" || growthResult.status === "rejected";
 
   return (
     <DashboardShell userName={user.name} activeItem="Portfolio">
@@ -56,7 +70,7 @@ export default async function PortfolioPage() {
             Add holdings, monitor current value, and review gain/loss using live market prices.
           </p>
         </div>
-        <PortfolioManager initialSummary={summary} initialGrowth={growth.points} />
+        <PortfolioManager initialSummary={summary} initialGrowth={growth} reloadOnMount={needsReload} />
       </div>
     </DashboardShell>
   );

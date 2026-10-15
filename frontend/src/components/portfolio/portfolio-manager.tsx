@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { LiveBadge } from "@/components/market/live-badge";
@@ -25,6 +25,7 @@ import { useMarketStream } from "@/lib/market-stream";
 type PortfolioManagerProps = {
   initialSummary: PortfolioSummary;
   initialGrowth: PortfolioGrowthPoint[];
+  reloadOnMount?: boolean;
 };
 
 function formatCurrency(value: number | null) {
@@ -47,7 +48,7 @@ function formatPercent(value: number | null) {
   return `${value.toFixed(2)}%`;
 }
 
-export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioManagerProps) {
+export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount = false }: PortfolioManagerProps) {
   const [summary, setSummary] = useState(initialSummary);
   const [growth, setGrowth] = useState(initialGrowth);
   const { showToast } = useToast();
@@ -64,14 +65,33 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
   );
   const { quotes, status, error: streamError, lastUpdated, marketSession, nextMarketOpen, hasExtendedHoursActivity } = useMarketStream(trackedSymbols, { initialPrices });
 
+  const [isReloading, setIsReloading] = useState(reloadOnMount);
+
   async function refreshPortfolio() {
-    const [updatedSummary, updatedGrowth] = await Promise.all([
-      getPortfolioSummary(),
-      getPortfolioGrowth(),
-    ]);
-    setSummary(updatedSummary);
-    setGrowth(updatedGrowth.points);
+    // Load holdings and growth independently so a slow price history cannot hide holdings.
+    const [summaryResult, growthResult] = await Promise.allSettled([getPortfolioSummary(), getPortfolioGrowth()]);
+    if (summaryResult.status === "fulfilled") {
+      setSummary(summaryResult.value);
+    }
+    if (growthResult.status === "fulfilled") {
+      setGrowth(growthResult.value.points);
+    }
+    if (summaryResult.status === "rejected") {
+      throw summaryResult.reason;
+    }
   }
+
+  useEffect(() => {
+    if (!reloadOnMount) {
+      return;
+    }
+
+    refreshPortfolio()
+      .catch(() => showToast({ message: "Portfolio data is taking longer than usual. Please refresh in a moment." }))
+      .finally(() => setIsReloading(false));
+    // Runs once after a failed server-side load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleCreateHolding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -126,7 +146,8 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
   // Totals only include holdings with a known price, so a data outage is not shown as a loss.
   const pricedHoldings = liveHoldings.filter((holding) => holding.current_value !== null);
   const unpricedCount = liveHoldings.length - pricedHoldings.length;
-  const hasPrices = pricedHoldings.length > 0;
+  // An empty portfolio has nothing to price; only show "Unavailable" when prices are missing.
+  const hasPrices = pricedHoldings.length > 0 || liveHoldings.length === 0;
   const liveTotalValue = pricedHoldings.reduce((total, holding) => total + (holding.current_value ?? 0), 0);
   const pricedCost = pricedHoldings.reduce((total, holding) => total + holding.cost_basis, 0);
   const totalCost = liveHoldings.reduce((total, holding) => total + holding.cost_basis, 0);
@@ -151,6 +172,7 @@ export function PortfolioManager({ initialSummary, initialGrowth }: PortfolioMan
           </div>
         ))}
       </div>
+      {isReloading ? <p className="text-xs text-muted-foreground">Loading latest portfolio data...</p> : null}
       {unpricedCount > 0 ? (
         <p className="text-xs text-muted-foreground">
           {unpricedCount} of {liveHoldings.length} holdings have no current price yet, so they are left out of the

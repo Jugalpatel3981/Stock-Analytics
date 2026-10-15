@@ -164,3 +164,58 @@ async def test_summary_excludes_holdings_without_a_price(monkeypatch) -> None:
     assert summary.total_cost == 200.0
     assert summary.total_gain_loss == 100.0
     assert summary.unpriced_holdings == 1
+
+
+async def test_growth_skips_symbols_whose_history_fails(monkeypatch) -> None:
+    from datetime import date
+
+    from fastapi import HTTPException
+
+    from app.models.portfolio import PortfolioHolding
+    from app.schemas.stock import HistoricalPricePoint, StockHistoryResponse
+    from app.services import stock_service
+
+    holdings = [
+        PortfolioHolding(
+            id=1,
+            user_id=1,
+            symbol="AAPL",
+            quantity=2,
+            buy_price=100.0,
+            buy_date=date(2025, 1, 1),
+            created_at=datetime.now(UTC),
+        ),
+        PortfolioHolding(
+            id=2,
+            user_id=1,
+            symbol="NVDA",
+            quantity=5,
+            buy_price=50.0,
+            buy_date=date(2025, 1, 1),
+            created_at=datetime.now(UTC),
+        ),
+    ]
+
+    async def fake_list_raw_holdings(_session, _user_id):
+        return holdings
+
+    async def fake_history(symbol: str, _range: str):
+        if symbol == "NVDA":
+            raise HTTPException(status_code=504, detail="slow")
+        return StockHistoryResponse(
+            ticker=symbol,
+            range="1y",
+            interval="1d",
+            prices=[
+                HistoricalPricePoint(
+                    timestamp="2025-06-02T00:00:00", open=1, high=1, low=1, close=150.0, volume=1
+                )
+            ],
+        )
+
+    monkeypatch.setattr(portfolio_service, "list_raw_holdings", fake_list_raw_holdings)
+    monkeypatch.setattr(stock_service, "get_stock_history", fake_history)
+
+    growth = await portfolio_service.get_portfolio_growth(None, 1)  # type: ignore[arg-type]
+
+    assert [(point.date, point.value) for point in growth.points] == [("2025-06-02", 300.0)]

@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from datetime import date
 
@@ -75,9 +76,11 @@ async def get_portfolio_summary(session: AsyncSession, user_id: int) -> Portfoli
     holdings = await list_raw_holdings(session, user_id)
     enriched_holdings: list[PortfolioHoldingRead] = []
 
+    # Look up each symbol once, all at the same time.
+    symbols = sorted({holding.symbol for holding in holdings})
+    prices = dict(zip(symbols, await asyncio.gather(*map(get_current_price, symbols)), strict=True))
     for holding in holdings:
-        current_price = await get_current_price(holding.symbol)
-        enriched_holdings.append(build_holding_read(holding, current_price))
+        enriched_holdings.append(build_holding_read(holding, prices[holding.symbol]))
 
     # Totals cover holdings with a known price, so a provider outage does not look like a loss.
     priced_holdings = [
@@ -141,10 +144,18 @@ async def get_portfolio_growth(session: AsyncSession, user_id: int) -> Portfolio
     holdings = await list_raw_holdings(session, user_id)
     values_by_date: dict[str, float] = defaultdict(float)
 
-    for holding in holdings:
+    async def load_history(symbol: str):
         try:
-            history = await stock_service.get_stock_history(holding.symbol, "1y")
+            return await stock_service.get_stock_history(symbol, "1y")
         except HTTPException:
+            return None
+
+    symbols = sorted({holding.symbol for holding in holdings})
+    histories = dict(zip(symbols, await asyncio.gather(*map(load_history, symbols)), strict=True))
+
+    for holding in holdings:
+        history = histories[holding.symbol]
+        if history is None:
             continue
 
         for point in history.prices:

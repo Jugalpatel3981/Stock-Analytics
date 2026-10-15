@@ -22,6 +22,9 @@ from app.services import sentiment_service
 
 logger = logging.getLogger(__name__)
 
+# Upper bound for one yfinance call, so a slow provider cannot stall whole pages.
+YAHOO_TIMEOUT_SECONDS = 12
+
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 
 COMPANY_SYMBOL_ALIASES = {
@@ -335,9 +338,15 @@ def _build_sentiment_trend(articles: list[StockNewsItem]) -> list[StockSentiment
 async def _from_yahoo[T](func: Callable[..., T], *args: Any) -> T:
     """Run a blocking yfinance call, turning network or parsing failures into a clean 502."""
     try:
-        return await asyncio.to_thread(func, *args)
+        return await asyncio.wait_for(asyncio.to_thread(func, *args), YAHOO_TIMEOUT_SECONDS)
     except HTTPException:
         raise
+    except TimeoutError as exc:
+        logger.warning("Yahoo Finance request timed out in %s", func.__name__)
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="The market data provider is responding slowly. Please try again shortly.",
+        ) from exc
     except Exception as exc:
         logger.warning("Yahoo Finance request failed in %s: %s", func.__name__, exc)
         raise HTTPException(
