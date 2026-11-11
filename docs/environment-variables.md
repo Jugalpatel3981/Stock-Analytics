@@ -19,7 +19,7 @@ FRONTEND_PORT=3000
 ## Backend Variables
 
 ```text
-APP_NAME=AI Stock Intelligence Platform API
+APP_NAME=Stock Intelligence Platform API
 APP_ENV=development
 API_V1_PREFIX=/api/v1
 BACKEND_CORS_ORIGINS=http://localhost:3000
@@ -30,23 +30,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 AUTH_COOKIE_NAME=access_token
 AUTH_COOKIE_SECURE=false
 DEMO_MODE_ENABLED=true
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4.1-mini
-GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
 FINNHUB_API_KEY=
-TAVILY_API_KEY=
-TAVILY_SEARCH_DEPTH=basic
-```
-
-## ML Pipeline Variables
-
-```text
-ML_SCHEDULER_ENABLED=true
-ML_RETRAIN_INTERVAL_DAYS=4
-ML_SCHEDULER_INITIAL_DELAY_SECONDS=30
-ML_DEFAULT_SYMBOLS=AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM
-ML_MIN_TRAINING_ROWS=120
 ```
 
 ## Frontend Variables
@@ -66,10 +50,6 @@ directly, authenticated with a short-lived token from `GET /api/v1/market/stream
 ## Integration Notes
 
 `FINNHUB_API_KEY` enables real-time WebSocket market streaming. Without it, live widgets show a clear configuration error instead of fake prices.
-
-`GROQ_API_KEY` enables Groq for the AI assistant and for news sentiment. Without it, every article is labelled Neutral. If both `GROQ_API_KEY` and `OPENAI_API_KEY` are set, the backend prefers Groq.
-
-`TAVILY_API_KEY` enables assistant web research and source citations. Without it, the assistant still uses existing platform stock, news, and sentiment context.
 
 `DEMO_MODE_ENABLED` turns the one-click demo login on or off.
 

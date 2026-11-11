@@ -16,9 +16,7 @@ from app.schemas.stock import (
     StockNewsItem,
     StockNewsResponse,
     StockSearchResult,
-    StockSentimentTrendPoint,
 )
-from app.services import sentiment_service
 
 logger = logging.getLogger(__name__)
 
@@ -296,45 +294,6 @@ def _build_stock_news_items(ticker: str, limit: int) -> list[StockNewsItem]:
     return articles
 
 
-def _build_sentiment_input(article: StockNewsItem) -> str:
-    return f"{article.headline}. {article.summary or ''}".strip()
-
-
-def _build_sentiment_trend(articles: list[StockNewsItem]) -> list[StockSentimentTrendPoint]:
-    grouped: dict[str, dict[str, float]] = {}
-
-    for article in articles:
-        if not article.publish_date:
-            continue
-
-        day = article.publish_date[:10]
-        if day not in grouped:
-            grouped[day] = {
-                "Positive": 0,
-                "Neutral": 0,
-                "Negative": 0,
-                "score_total": 0.0,
-                "count": 0,
-            }
-
-        grouped[day][article.sentiment_label] += 1
-        grouped[day]["score_total"] += article.sentiment_score
-        grouped[day]["count"] += 1
-
-    return [
-        StockSentimentTrendPoint(
-            date=day,
-            positive=int(values["Positive"]),
-            neutral=int(values["Neutral"]),
-            negative=int(values["Negative"]),
-            average_score=round(values["score_total"] / values["count"], 4)
-            if values["count"]
-            else 0.0,
-        )
-        for day, values in sorted(grouped.items())
-    ]
-
-
 async def _from_yahoo[T](func: Callable[..., T], *args: Any) -> T:
     """Run a blocking yfinance call, turning network or parsing failures into a clean 502."""
     try:
@@ -384,26 +343,7 @@ async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
 
 async def _load_stock_news(normalized_ticker: str, limit: int) -> StockNewsResponse:
     articles = await _from_yahoo(_build_stock_news_items, normalized_ticker, limit)
-
-    sentiments = await sentiment_service.analyze_sentiments(
-        [_build_sentiment_input(article) for article in articles]
-    )
-    enriched_articles = [
-        article.model_copy(
-            update={
-                "sentiment_label": sentiment.label,
-                "sentiment_score": sentiment.score,
-            }
-        )
-        for article, sentiment in zip(articles, sentiments, strict=True)
-    ]
-
-    return StockNewsResponse(
-        ticker=normalized_ticker,
-        articles=enriched_articles,
-        sentiment_trend=_build_sentiment_trend(enriched_articles),
-        sentiment_model=sentiment_service.sentiment_model_name(),
-    )
+    return StockNewsResponse(ticker=normalized_ticker, articles=articles)
 
 
 def _build_search_result_from_quote(quote: dict[str, Any]) -> StockSearchResult | None:

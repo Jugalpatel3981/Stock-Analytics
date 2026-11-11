@@ -1,5 +1,4 @@
 import {
-  Bot,
   BriefcaseBusiness,
   LayoutDashboard,
   ListChecks,
@@ -19,12 +18,11 @@ const navigationItems = [
   { label: "Watchlists", href: "/watchlists", icon: ListChecks },
   { label: "Portfolio", href: "/portfolio", icon: BriefcaseBusiness },
   { label: "News", href: "/news", icon: Newspaper },
-  { label: "AI Assistant", href: "/assistant", icon: Bot },
 ];
 
 type DashboardShellProps = {
   userName: string;
-  activeItem?: "Dashboard" | "Stocks" | "Watchlists" | "Portfolio" | "News" | "AI Assistant";
+  activeItem?: "Dashboard" | "Stocks" | "Watchlists" | "Portfolio" | "News";
   children: ReactNode;
 };
 
@@ -40,7 +38,7 @@ export function DashboardShell({ userName, activeItem = "Dashboard", children }:
                   <TrendingUp className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">AI Stock Intel</p>
+                  <p className="text-sm font-semibold">Stock Intel</p>
                   <p className="text-xs text-muted-foreground">Research workspace</p>
                 </div>
               </div>

@@ -19,16 +19,10 @@ services:
         generateValue: true
       - key: DEMO_MODE_ENABLED
         value: "true"
-      - key: ML_SCHEDULER_INITIAL_DELAY_SECONDS
-        value: "120"
       # Values below are entered in the Render dashboard when the Blueprint is created.
       - key: DATABASE_URL
         sync: false
       - key: BACKEND_CORS_ORIGINS
         sync: false
-      - key: GROQ_API_KEY
-        sync: false
       - key: FINNHUB_API_KEY
-        sync: false
-      - key: TAVILY_API_KEY
         sync: false

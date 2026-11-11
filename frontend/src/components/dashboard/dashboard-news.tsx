@@ -4,17 +4,10 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { getStockNews, getWatchlists, type StockNewsItem } from "@/lib/api";
 
 const FALLBACK_TICKER = "NVDA";
 const ARTICLE_LIMIT = 4;
-
-const sentimentVariant = {
-  Positive: "text-emerald-400",
-  Neutral: "text-muted-foreground",
-  Negative: "text-red-400",
-} as const;
 
 function formatPublishDate(value: string | null) {
   if (!value) {
@@ -98,13 +91,10 @@ export function DashboardNews() {
               article.headline
             )}
           </h2>
-          <Badge variant="outline" className={`mt-3 ${sentimentVariant[article.sentiment_label]}`}>
-            {article.sentiment_label}
-          </Badge>
         </article>
       ))}
       <Link className="block text-center text-xs font-medium text-primary hover:underline" href={`/news?ticker=${ticker}`}>
-        More news and sentiment trends
+        More news
       </Link>
     </div>
   );

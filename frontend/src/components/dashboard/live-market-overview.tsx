@@ -22,7 +22,7 @@ const DEFAULT_MARKET_SYMBOLS: MarketSymbol[] = [
   { symbol: "SPY", label: "S&P 500 ETF" },
   { symbol: "QQQ", label: "Nasdaq 100 ETF" },
   { symbol: "DIA", label: "Dow ETF" },
-  { symbol: "NVDA", label: "AI leader" },
+  { symbol: "NVDA", label: "NVIDIA" },
 ];
 
 const STORAGE_KEY = "dashboard-market-symbols";
@@ -174,21 +174,6 @@ export function LiveMarketOverview() {
             <LivePrice quote={quotes[item.symbol]} compact />
           </div>
         ))}
-      </div>
-      <div className="h-48 rounded-md border bg-background/40 p-4">
-        <div className="flex h-full items-end gap-2">
-          {marketSymbols.flatMap((item, index) => {
-            const quote = quotes[item.symbol];
-            const height = Math.max(18, Math.min(96, 50 + (quote?.changePercent ?? index * 4)));
-            return (
-              <div
-                key={item.symbol}
-                className="min-w-0 flex-1 rounded-t bg-primary/70 transition-all"
-                style={{ height: `${height}%` }}
-              />
-            );
-          })}
-        </div>
       </div>
     </div>
   );

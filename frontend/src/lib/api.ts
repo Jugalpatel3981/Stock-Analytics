@@ -59,50 +59,11 @@ export type StockNewsItem = {
   publish_date: string | null;
   summary: string | null;
   url: string | null;
-  sentiment_label: "Positive" | "Neutral" | "Negative";
-  sentiment_score: number;
-};
-
-export type StockSentimentTrendPoint = {
-  date: string;
-  positive: number;
-  neutral: number;
-  negative: number;
-  average_score: number;
 };
 
 export type StockNewsResponse = {
   ticker: string;
   articles: StockNewsItem[];
-  sentiment_trend: StockSentimentTrendPoint[];
-  sentiment_model: string;
-  data_source: string;
-};
-
-export type PredictionBacktest = {
-  test_days: number;
-  direction_accuracy: number;
-  baseline_direction_accuracy: number;
-  mae: number;
-  baseline_mae: number;
-  skill_score: number;
-  strategy_return: number;
-  buy_and_hold_return: number;
-};
-
-export type StockPrediction = {
-  ticker: string;
-  status: "ready" | "preparing";
-  predicted_close: number | null;
-  predicted_return_percent: number | null;
-  direction: "up" | "down" | "flat" | null;
-  latest_close: number | null;
-  expected_price_low: number | null;
-  expected_price_high: number | null;
-  backtest: PredictionBacktest | null;
-  prediction_timestamp: string | null;
-  message: string | null;
-  prediction_horizon: string;
   data_source: string;
 };
 
@@ -129,43 +90,6 @@ export type MarketQuoteSnapshot = {
 };
 
 export type MarketSession = "PRE_MARKET" | "OPEN" | "AFTER_HOURS" | "CLOSED";
-
-export type ChatRole = "user" | "assistant";
-
-export type ChatSource = {
-  id: number | null;
-  stock_symbol: string | null;
-  source_name: string;
-  title: string;
-  published_at: string | null;
-  url: string | null;
-};
-
-export type ChatMessage = {
-  id: number;
-  role: ChatRole;
-  content: string;
-  created_at: string;
-  stock_symbol: string | null;
-  sources: ChatSource[];
-};
-
-export type ChatSession = {
-  id: number;
-  title: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ChatSessionDetail = ChatSession & {
-  messages: ChatMessage[];
-};
-
-export type ChatExchangeResponse = {
-  session: ChatSession;
-  user_message: ChatMessage;
-  assistant_message: ChatMessage;
-};
 
 export type WatchlistStock = {
   id: number;
@@ -281,41 +205,9 @@ export function getStockNews(ticker: string, limit = 10) {
   return apiRequest<StockNewsResponse>(`/stocks/news?${params.toString()}`);
 }
 
-export function getStockPrediction(ticker: string) {
-  return apiRequest<StockPrediction>(`/stocks/${ticker}/prediction`);
-}
-
 export function getMarketQuotes(symbols: string[]) {
   const params = new URLSearchParams({ symbols: symbols.join(",") });
   return apiRequest<MarketQuoteSnapshot[]>(`/market/quotes?${params.toString()}`);
-}
-
-export function getChatSessions() {
-  return apiRequest<ChatSession[]>("/chat/sessions");
-}
-
-export function createChatSession(input: { title?: string | null }) {
-  return apiRequest<ChatSession>("/chat/sessions", {
-    method: "POST",
-    body: input,
-  });
-}
-
-export function getChatSession(sessionId: number) {
-  return apiRequest<ChatSessionDetail>(`/chat/sessions/${sessionId}`);
-}
-
-export function deleteChatSession(sessionId: number) {
-  return apiRequest<void>(`/chat/sessions/${sessionId}`, {
-    method: "DELETE",
-  });
-}
-
-export function sendChatMessage(sessionId: number, input: { content: string }) {
-  return apiRequest<ChatExchangeResponse>(`/chat/sessions/${sessionId}/messages`, {
-    method: "POST",
-    body: input,
-  });
 }
 
 export function createWatchlist(input: { name: string }) {

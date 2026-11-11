@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { LivePrice } from "@/components/market/live-price";
 import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { getWatchlists, type Watchlist } from "@/lib/api";
@@ -35,22 +34,14 @@ function getUniqueWatchlistSymbols(watchlists: Watchlist[]) {
   ).slice(0, MAX_DASHBOARD_SYMBOLS);
 }
 
-function getSignal(quote: LiveQuote | undefined) {
+function formatChange(quote: LiveQuote | undefined) {
   const changePercent = quote?.changePercent;
 
   if (changePercent === null || changePercent === undefined) {
-    return "Watching";
+    return null;
   }
 
-  if (changePercent >= 1) {
-    return "Momentum";
-  }
-
-  if (changePercent <= -1) {
-    return "Review";
-  }
-
-  return "Stable";
+  return `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
 }
 
 function formatVolume(value: number | null | undefined) {
@@ -106,14 +97,14 @@ export function DashboardWatchlist() {
     () =>
       symbols.map((symbol) => {
         const quote = quotes[symbol];
-        const signal = getSignal(quote);
 
         return {
           symbol,
           company: COMPANY_NAMES[symbol] ?? symbol,
           quote,
           volume: formatVolume(quote?.todayVolume),
-          signal,
+          change: formatChange(quote),
+          isUp: (quote?.changePercent ?? 0) >= 0,
         };
       }),
     [quotes, symbols],
@@ -144,7 +135,7 @@ export function DashboardWatchlist() {
             <span>Company</span>
             <span>Price</span>
             <span>Volume</span>
-            <span className="text-right">Signal</span>
+            <span className="text-right">Today</span>
           </div>
           {rows.map((stock) => (
             <div
@@ -157,13 +148,13 @@ export function DashboardWatchlist() {
               <span className="text-muted-foreground">{stock.company}</span>
               <LivePrice quote={stock.quote} compact />
               <span className="text-muted-foreground">{stock.volume}</span>
-              <span className="text-right">
-                <Badge
-                  variant={stock.signal === "Review" ? "outline" : "secondary"}
-                  className={cn(stock.signal === "Review" && "border-red-400/40 text-red-300")}
-                >
-                  {stock.signal}
-                </Badge>
+              <span
+                className={cn(
+                  "text-right font-medium",
+                  stock.change === null ? "text-muted-foreground" : stock.isUp ? "text-emerald-400" : "text-red-400",
+                )}
+              >
+                {stock.change ?? "Waiting"}
               </span>
             </div>
           ))}

@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+- The AI assistant, news sentiment and price prediction features, with their database
+  tables (migration `0003`), settings and dependencies. The prediction model did not beat
+  simple baselines in its own backtest, and the AI features depended on an LLM provider
+  that was no longer available.
+- The decorative bar chart on the dashboard and the "Momentum" / "Review" watchlist tags,
+  which did not represent real data. The watchlist now shows today's percentage change.
+
 ## [1.0.0] - 2026-10-15
 
 First public release.

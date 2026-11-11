@@ -1,10 +1,10 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "AI Stock Intelligence: live prices, AI research and backtested predictions";
+export const alt = "Stock Intelligence: live prices, stock research and portfolio tracking";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const features = ["Live prices", "AI research assistant", "News sentiment", "Backtested ML", "Portfolio tracking"];
+const features = ["Live prices", "Stock research", "Price charts", "Watchlists", "Portfolio tracking"];
 
 // Preview card shown when the site link is shared (LinkedIn, Slack, messaging apps).
 export default function OpenGraphImage() {
@@ -41,12 +41,12 @@ export default function OpenGraphImage() {
             <div style={{ width: 8, height: 32, borderRadius: 4, background: "#08111f" }} />
             <div style={{ width: 8, height: 24, borderRadius: 4, background: "#08111f" }} />
           </div>
-          <div style={{ fontSize: 34, fontWeight: 600 }}>AI Stock Intelligence</div>
+          <div style={{ fontSize: 34, fontWeight: 600 }}>Stock Intelligence</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.1, maxWidth: 980 }}>
-            Live prices, AI research and honestly backtested predictions
+            Live prices, stock research and portfolio tracking
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
             {features.map((feature) => (
@@ -66,7 +66,7 @@ export default function OpenGraphImage() {
           </div>
         </div>
 
-        <div style={{ fontSize: 24, color: "#94a3b8" }}>Next.js · FastAPI · PostgreSQL · XGBoost · Groq</div>
+        <div style={{ fontSize: 24, color: "#94a3b8" }}>Next.js · FastAPI · PostgreSQL · Finnhub · Docker</div>
       </div>
     ),
     size,

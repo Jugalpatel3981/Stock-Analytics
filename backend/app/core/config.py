@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "AI Stock Intelligence Platform API"
+    app_name: str = "Stock Intelligence Platform API"
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     backend_cors_origins: str = "http://localhost:3000"
@@ -20,18 +20,7 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "access_token"
     auth_cookie_secure: bool = False
     demo_mode_enabled: bool = True
-    openai_api_key: str | None = None
-    openai_model: str = "gpt-4.1-mini"
-    groq_api_key: str | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
     finnhub_api_key: str | None = None
-    tavily_api_key: str | None = None
-    tavily_search_depth: str = "basic"
-    ml_scheduler_enabled: bool = True
-    ml_retrain_interval_days: int = 4
-    ml_scheduler_initial_delay_seconds: int = 30
-    ml_default_symbols: str = "AAPL,MSFT,NVDA,TSLA,AMZN,GOOGL,META,JPM"
-    ml_min_training_rows: int = 120
 
     @field_validator("database_url")
     @classmethod
@@ -79,14 +68,6 @@ class Settings(BaseSettings):
                 return [str(origin).strip() for origin in parsed_value if str(origin).strip()]
 
         return [origin.strip() for origin in value.split(",") if origin.strip()]
-
-    @property
-    def default_ml_symbols(self) -> list[str]:
-        return [
-            symbol.strip().upper()
-            for symbol in self.ml_default_symbols.split(",")
-            if symbol.strip()
-        ]
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),

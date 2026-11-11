@@ -1,6 +1,6 @@
 # Backend
 
-FastAPI service for the AI Stock Intelligence Platform.
+FastAPI service for the Stock Intelligence Platform.
 
 ## Commands
 
@@ -11,7 +11,6 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 pytest
 ruff check .
-python -m app.ml.backtest --symbols AAPL MSFT   # model backtest report
 ```
 
 ## Environment

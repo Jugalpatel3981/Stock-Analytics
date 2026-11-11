@@ -1,31 +1,15 @@
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
-from app.ml.scheduler import MLPipelineScheduler
 
 settings = get_settings()
-ml_scheduler = MLPipelineScheduler(settings)
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
-    ml_scheduler.start()
-    try:
-        yield
-    finally:
-        await ml_scheduler.stop()
-
 
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
     openapi_url=f"{settings.api_v1_prefix}/openapi.json",
-    lifespan=lifespan,
 )
 
 app.add_middleware(

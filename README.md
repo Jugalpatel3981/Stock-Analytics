@@ -1,8 +1,8 @@
 ﻿<div align="center">
 
-# AI Stock Intelligence Platform
+# Stock Intelligence Platform
 
-**Live prices, AI-powered research and honestly backtested predictions in one dashboard.**
+**Live prices, stock research and portfolio tracking in one dashboard.**
 
 [![CI](https://github.com/Jugalpatel3981/ai-stock-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Jugalpatel3981/ai-stock-intelligence-platform/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -12,15 +12,15 @@
 
 <!-- LIVE-DEMO-LINK: added after deployment -->
 
-![Dashboard](screenshots/dashboard.png)
+![Landing page](screenshots/landing.png)
 
 </div>
 
 ## Overview
 
-A full-stack web app for researching US stocks. Search any ticker, follow it with real-time
-prices, read the latest news with AI sentiment, ask an AI assistant that cites its sources,
-track a portfolio, and see a next-day forecast together with the model's real track record.
+A full-stack web app for researching US stocks. Search a ticker, follow it with real-time
+prices, view its price history and company profile, read recent headlines, organise
+watchlists and track a portfolio.
 
 > For informational and educational purposes only. Not financial advice.
 
@@ -29,22 +29,11 @@ track a portfolio, and see a next-day forecast together with the model's real tr
 | | Feature | How it works |
 | --- | --- | --- |
 | 📈 | **Real-time prices** | The backend proxies Finnhub's WebSocket to the browser and labels pre-market, regular and after-hours sessions. |
-| 🤖 | **AI research assistant** | Answers combine price data, news, sentiment and Tavily web search. Every answer lists its sources. |
-| 📰 | **News sentiment** | Headlines are classified by an LLM (Groq) in a single batched call and cached, so each article is analysed once. |
-| 🧠 | **Backtested predictions** | XGBoost predicts the next-day return. Each prediction shows walk-forward accuracy against simple baselines. |
 | 💼 | **Portfolio and watchlists** | Live gain/loss, a portfolio growth chart, and multiple watchlists. |
 | 🔐 | **Secure accounts** | bcrypt passwords and JWT sessions in HttpOnly cookies, plus a one-click demo account. |
-| ⚙️ | **Production engineering** | Background retraining, models stored in PostgreSQL, Alembic migrations, caching, rate limiting and CI. |
-
-## Screenshots
-
-| Stock detail | AI assistant |
-| --- | --- |
-| ![Stock detail page with live price and chart](screenshots/stock-detail.png) | ![AI assistant answer with cited sources](screenshots/assistant.png) |
-| **Prediction with backtest** | **News and sentiment** |
-| ![Prediction card with track record](screenshots/prediction.png) | ![News feed with sentiment labels and trend](screenshots/news.png) |
-| **Portfolio** | **Landing page** |
-| ![Portfolio holdings and growth chart](screenshots/portfolio.png) | ![Landing page with demo login](screenshots/landing.png) |
+| 🔎 | **Stock research** | Company profile, key statistics and price history over one day to one year. |
+| 📰 | **News** | Recent headlines filtered by ticker. |
+| ⚙️ | **Production engineering** | Alembic migrations, caching, rate limiting, Docker and CI. |
 
 ## Architecture
 
@@ -54,14 +43,11 @@ flowchart LR
     UI <-->|live ticks| WS[WebSocket proxy]
     WS <--> Finnhub[[Finnhub]]
     API --> Yahoo[[Yahoo Finance]]
-    API --> Groq[[Groq LLM]]
-    API --> Tavily[[Tavily]]
     API --> DB[(PostgreSQL)]
-    Scheduler[ML scheduler] --> DB
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design: auth, market data
-flow, the AI assistant and the ML pipeline.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design: auth and the market
+data flow.
 
 ## Tech stack
 
@@ -69,42 +55,22 @@ flow, the AI assistant and the ML pipeline.
 | --- | --- |
 | Frontend | Next.js 15 (App Router), React, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
 | Backend | FastAPI, Python 3.12, SQLAlchemy 2 (async), Pydantic, WebSockets |
-| Data and ML | PostgreSQL, pandas, NumPy, XGBoost, yfinance |
-| AI | Groq (Llama 3.3 70B), Tavily search |
+| Data | PostgreSQL, yfinance |
 | Market data | Finnhub WebSocket and REST, Yahoo Finance |
 | DevOps | Docker, Docker Compose, Alembic, GitHub Actions, Render, Vercel, Neon |
-
-## Prediction model: honest evaluation
-
-Most stock-prediction demos report a "98% accuracy" that comes from scoring tomorrow's
-*price*, which is almost the same as today's. This project measures what matters:
-
-- **Target:** the next-day *return*, predicted from 19 scale-free technical features.
-- **Validation:** expanding-window walk-forward, so every test prediction comes from a model
-  trained only on earlier data. There is no look-ahead bias.
-- **Baselines:** the naive "tomorrow = today" forecast for price error, and always guessing
-  the most common direction for accuracy.
-- **Strategy check:** holding only on predicted up-days, compared with buy-and-hold.
-
-The results are in **[docs/model-performance.md](docs/model-performance.md)**. They are
-generated by `python -m app.ml.backtest` or the *Model Backtest* GitHub Action. As expected
-for daily returns, the edge over the baselines is small, and the app says so next to every
-prediction instead of showing a made-up confidence score.
 
 ## Getting started
 
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- Free API keys:
+- A free API key:
 
 | Key | Used for | Required? |
 | --- | --- | --- |
-| `GROQ_API_KEY` ([console.groq.com](https://console.groq.com)) | AI assistant and news sentiment | Recommended |
 | `FINNHUB_API_KEY` ([finnhub.io](https://finnhub.io)) | Real-time prices | Recommended |
-| `TAVILY_API_KEY` ([tavily.com](https://tavily.com)) | Web research in the assistant | Optional |
 
-The app still runs without keys. Those features show a clear "not configured" message.
+The app still runs without the key. Live prices then show a clear "not configured" message.
 
 ### Run with Docker
 
@@ -112,7 +78,7 @@ The app still runs without keys. Those features show a clear "not configured" me
 git clone https://github.com/Jugalpatel3981/ai-stock-intelligence-platform.git
 cd ai-stock-intelligence-platform
 cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
-# Add your API keys to .env
+# Add your Finnhub API key to .env
 docker compose up --build
 ```
 
@@ -124,10 +90,9 @@ Open **http://localhost:3000** and click **Try the live demo**.
 | API docs (Swagger) | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
 
-### Deploy for free
+### Deploy
 
-The live demo runs on Vercel, Render and Neon free tiers. See
-**[docs/deployment.md](docs/deployment.md)** for a 15-minute walkthrough.
+[docs/deployment.md](docs/deployment.md) describes a free-tier setup on Vercel, Render and Neon.
 
 <details>
 <summary><b>Run without Docker</b></summary>
@@ -140,7 +105,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
-cp .env.example .env               # set DATABASE_URL and your API keys
+cp .env.example .env               # set DATABASE_URL and your Finnhub key
 python -m app.scripts.init_db
 uvicorn app.main:app --reload
 
@@ -174,7 +139,6 @@ CI runs all of these, plus a production frontend build and Docker image builds, 
 │   │   ├── api/          # FastAPI routers and dependencies
 │   │   ├── core/         # Settings, database, security
 │   │   ├── market/       # Finnhub streaming, market sessions, quote cache
-│   │   ├── ml/           # Features, training, evaluation, registry, scheduler, backtest
 │   │   ├── models/       # SQLAlchemy tables
 │   │   ├── schemas/      # Pydantic models
 │   │   └── services/     # Business logic and integrations
@@ -183,8 +147,8 @@ CI runs all of these, plus a production frontend build and Docker image builds, 
 │   ├── app/              # Next.js routes
 │   ├── components/       # UI and feature components
 │   └── lib/              # API client and helpers
-├── docs/                 # Architecture, model performance, environment variables
-└── .github/workflows/    # CI and model backtest
+├── docs/                 # Architecture, deployment, environment variables
+└── .github/workflows/    # CI
 ```
 
 ## API overview
@@ -196,11 +160,9 @@ Interactive docs are available at `/docs` when the backend is running.
 | Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/demo`, `GET /auth/me` |
 | Stocks | `GET /stocks/search`, `GET /stocks/{ticker}`, `GET /stocks/{ticker}/history` |
 | News | `GET /stocks/news?ticker=NVDA` |
-| Prediction | `GET /stocks/{ticker}/prediction` |
 | Market | `GET /market/quotes?symbols=NVDA,AAPL`, `WS /market/stream?symbols=NVDA,AAPL` |
 | Watchlists | `GET /watchlists`, `POST /watchlists`, `POST /watchlists/{id}/stocks` |
 | Portfolio | `GET /portfolio/holdings`, `GET /portfolio/growth` |
-| Assistant | `GET /chat/sessions`, `POST /chat/sessions/{id}/messages` |
 
 All paths are prefixed with `/api/v1`.
 

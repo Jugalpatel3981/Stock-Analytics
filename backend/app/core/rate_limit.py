@@ -56,4 +56,3 @@ def reset_all_rate_limits() -> None:
 login_rate_limit = RateLimit("login", max_requests=10, window_seconds=60)
 register_rate_limit = RateLimit("register", max_requests=5, window_seconds=60)
 demo_rate_limit = RateLimit("demo", max_requests=20, window_seconds=60)
-chat_rate_limit = RateLimit("chat", max_requests=15, window_seconds=60)

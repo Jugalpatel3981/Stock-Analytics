@@ -4,13 +4,11 @@ import { ExternalLink, Newspaper, Search } from "lucide-react";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 
-import { SentimentTrendChart } from "@/components/news/sentiment-trend-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
-import { getStockNews, type StockNewsItem, type StockSentimentTrendPoint } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { getStockNews, type StockNewsItem } from "@/lib/api";
 
 type StockNewsFeedProps = {
   initialTicker: string;
@@ -38,8 +36,6 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
   const [ticker, setTicker] = useState(initialTicker);
   const [activeTicker, setActiveTicker] = useState(initialTicker);
   const [articles, setArticles] = useState<StockNewsItem[]>([]);
-  const [sentimentTrend, setSentimentTrend] = useState<StockSentimentTrendPoint[]>([]);
-  const [sentimentModel, setSentimentModel] = useState("Groq LLM");
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -50,11 +46,8 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
       const news = await getStockNews(nextTicker.trim().toUpperCase());
       setActiveTicker(news.ticker);
       setArticles(news.articles);
-      setSentimentTrend(news.sentiment_trend);
-      setSentimentModel(news.sentiment_model);
     } catch (caughtError) {
       setArticles([]);
-      setSentimentTrend([]);
       showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to load stock news" });
     } finally {
       setIsLoading(false);
@@ -92,7 +85,7 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">{activeTicker} Headlines</p>
-          <p className="text-xs text-muted-foreground">Sentiment model: {sentimentModel}. News can move prices, but it is not investment advice.</p>
+          <p className="text-xs text-muted-foreground">News can move prices, but it is not investment advice.</p>
         </div>
         <Badge variant="outline">{articles.length} articles</Badge>
       </div>
@@ -106,23 +99,7 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
           No recent articles found for this ticker.
         </div>
       ) : (
-        <>
-          <section className="rounded-lg border bg-background/40 p-4">
-            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h3 className="text-base font-semibold">Sentiment Trend</h3>
-                <p className="text-sm text-muted-foreground">Daily article counts with average sentiment score from -1 to 1.</p>
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-emerald-300">Positive</span>
-                <span className="rounded-md border border-slate-400/30 bg-slate-400/10 px-2 py-1 text-slate-300">Neutral</span>
-                <span className="rounded-md border border-red-400/30 bg-red-400/10 px-2 py-1 text-red-300">Negative</span>
-              </div>
-            </div>
-            <SentimentTrendChart points={sentimentTrend} />
-          </section>
-
-          <div className="grid gap-3">
+        <div className="grid gap-3">
             {articles.map((article) => (
               <article key={`${article.headline}-${article.publish_date ?? "unknown"}`} className="rounded-lg border bg-background/40 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -133,16 +110,6 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
                         {article.source ?? "Unknown source"}
                       </span>
                       <span>{formatPublishDate(article.publish_date)}</span>
-                      <span
-                        className={cn(
-                          "rounded-md border px-2 py-0.5 font-medium",
-                          article.sentiment_label === "Positive" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
-                          article.sentiment_label === "Neutral" && "border-slate-400/30 bg-slate-400/10 text-slate-300",
-                          article.sentiment_label === "Negative" && "border-red-400/30 bg-red-400/10 text-red-300",
-                        )}
-                      >
-                        {article.sentiment_label} {article.sentiment_score.toFixed(2)}
-                      </span>
                     </div>
                     <h3 className="text-base font-semibold leading-6">{article.headline}</h3>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -160,8 +127,7 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
                 </div>
               </article>
             ))}
-          </div>
-        </>
+        </div>
       )}
     </div>
   );

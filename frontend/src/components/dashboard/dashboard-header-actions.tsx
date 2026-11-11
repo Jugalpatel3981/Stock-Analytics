@@ -1,54 +1,21 @@
 "use client";
 
-import { Bot, ExternalLink, Newspaper, Search, Sparkles, TrendingUp } from "lucide-react";
+import { ExternalLink, Newspaper, Search, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
 import { searchStocks, type StockSearchResult } from "@/lib/api";
-import { cn } from "@/lib/utils";
-
-const analysisTypes = [
-  { value: "overview", label: "Stock Overview" },
-  { value: "news", label: "News Summary" },
-  { value: "sentiment", label: "Sentiment Analysis" },
-  { value: "prediction", label: "Prediction Explanation" },
-];
-
-function buildAnalysisPrompt(symbolOrCompany: string, analysisType: string) {
-  const target = symbolOrCompany.trim();
-
-  if (analysisType === "news") {
-    return `Summarize recent developments for ${target} using stock data, news, sentiment, and sources.`;
-  }
-
-  if (analysisType === "sentiment") {
-    return `What is the current market sentiment for ${target}? Use recent news, sentiment data, and cite sources.`;
-  }
-
-  if (analysisType === "prediction") {
-    return `Explain the current prediction signal for ${target}. Use available indicators, price data, and news sentiment. Do not fabricate reasoning.`;
-  }
-
-  return `Analyze ${target} today using stock data, recent news, sentiment, risks, and source citations.`;
-}
-
-function assistantHref(prompt: string) {
-  return `/assistant?prompt=${encodeURIComponent(prompt)}`;
-}
 
 export function DashboardHeaderActions() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StockSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
-  const [analysisTarget, setAnalysisTarget] = useState("");
-  const [analysisType, setAnalysisType] = useState("overview");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { showToast } = useToast();
@@ -57,7 +24,6 @@ export function DashboardHeaderActions() {
     function handlePointerDown(event: PointerEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
         setIsSearchOpen(false);
-        setIsAnalysisOpen(false);
       }
     }
 
@@ -90,11 +56,6 @@ export function DashboardHeaderActions() {
     return () => window.clearTimeout(timeoutId);
   }, [query]);
 
-  const selectedAnalysisLabel = useMemo(
-    () => analysisTypes.find((type) => type.value === analysisType)?.label ?? "Stock Overview",
-    [analysisType],
-  );
-
   async function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = query.trim();
@@ -122,19 +83,6 @@ export function DashboardHeaderActions() {
     }
   }
 
-  function handleStartAnalysis(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const target = analysisTarget.trim();
-
-    if (!target) {
-      showToast({ message: "Enter a company or ticker to analyze." });
-      return;
-    }
-
-    router.push(assistantHref(buildAnalysisPrompt(target, analysisType)));
-    setIsAnalysisOpen(false);
-  }
-
   return (
     <div ref={containerRef} className="relative flex items-center gap-2">
       <form className="relative hidden md:block" onSubmit={handleSearchSubmit}>
@@ -149,20 +97,16 @@ export function DashboardHeaderActions() {
             setIsSearchOpen(true);
           }}
           onFocus={() => setIsSearchOpen(true)}
-          placeholder="Search symbols, company, news"
+          placeholder="Search company or ticker"
           value={query}
         />
       </form>
-
-      <Button type="button" size="sm" onClick={() => setIsAnalysisOpen((current) => !current)}>
-        New Analysis
-      </Button>
 
       {isSearchOpen && query.trim().length >= 2 ? (
         <div className="absolute right-0 top-12 z-50 w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-md border bg-card shadow-xl">
           <div className="border-b px-4 py-3">
             <p className="text-sm font-semibold">Search Results</p>
-            <p className="text-xs text-muted-foreground">Open stocks, news, or start an AI research prompt.</p>
+            <p className="text-xs text-muted-foreground">Open the stock detail page or its news.</p>
           </div>
           {isSearching ? (
             <p className="px-4 py-5 text-sm text-muted-foreground">Searching...</p>
@@ -201,15 +145,6 @@ export function DashboardHeaderActions() {
                         News
                       </Link>
                     </Button>
-                    <Button size="sm" variant="secondary" asChild>
-                      <Link
-                        href={assistantHref(buildAnalysisPrompt(stock.ticker, "overview"))}
-                        onClick={() => setIsSearchOpen(false)}
-                      >
-                        <Bot className="h-4 w-4" aria-hidden="true" />
-                        Ask AI
-                      </Link>
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -218,50 +153,6 @@ export function DashboardHeaderActions() {
         </div>
       ) : null}
 
-      {isAnalysisOpen ? (
-        <div className="absolute right-0 top-12 z-50 w-[min(28rem,calc(100vw-2rem))] rounded-md border bg-card p-4 shadow-xl">
-          <div className="mb-4">
-            <p className="text-sm font-semibold">New Analysis</p>
-            <p className="text-xs text-muted-foreground">Create a focused AI assistant prompt with stock, news, and sentiment context.</p>
-          </div>
-          <form className="space-y-3" onSubmit={handleStartAnalysis}>
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground" htmlFor="analysis-target">
-                Company or ticker
-              </label>
-              <Input
-                id="analysis-target"
-                maxLength={80}
-                onChange={(event) => setAnalysisTarget(event.target.value)}
-                placeholder="e.g. Nvidia or NVDA"
-                value={analysisTarget}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground" htmlFor="analysis-type">
-                Analysis type
-              </label>
-              <select
-                id="analysis-type"
-                className={cn(
-                  "h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                )}
-                onChange={(event) => setAnalysisType(event.target.value)}
-                value={analysisType}
-              >
-                {analysisTypes.map((type) => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
-            <Button className="w-full" type="submit">
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              Start {selectedAnalysisLabel}
-            </Button>
-          </form>
-        </div>
-      ) : null}
     </div>
   );
 }

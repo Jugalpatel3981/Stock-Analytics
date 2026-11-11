@@ -5,7 +5,7 @@ import { StockNewsFeed } from "@/components/news/stock-news-feed";
 import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
 
-export const metadata: Metadata = { title: "News & Sentiment" };
+export const metadata: Metadata = { title: "News" };
 
 type NewsPageProps = {
   searchParams?: Promise<{ ticker?: string | string[] }>;

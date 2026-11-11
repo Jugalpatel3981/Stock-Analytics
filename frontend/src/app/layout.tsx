@@ -11,25 +11,25 @@ const siteUrl =
     : "http://localhost:3000");
 
 const description =
-  "Live stock prices, an AI research assistant with cited sources, news sentiment, portfolio tracking and backtested ML predictions.";
+  "Live stock prices, stock research, market news, watchlists and portfolio tracking in one dashboard.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "AI Stock Intelligence",
-    template: "%s · AI Stock Intelligence",
+    default: "Stock Intelligence",
+    template: "%s · Stock Intelligence",
   },
   description,
-  applicationName: "AI Stock Intelligence",
+  applicationName: "Stock Intelligence",
   openGraph: {
     type: "website",
-    siteName: "AI Stock Intelligence",
-    title: "AI Stock Intelligence",
+    siteName: "Stock Intelligence",
+    title: "Stock Intelligence",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Stock Intelligence",
+    title: "Stock Intelligence",
     description,
   },
 };

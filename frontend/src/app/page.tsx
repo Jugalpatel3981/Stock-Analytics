@@ -1,12 +1,12 @@
 import {
   Activity,
   BarChart3,
-  BrainCircuit,
   Briefcase,
+  LineChart,
   LayoutDashboard,
   Newspaper,
+  Search,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,19 +21,14 @@ const features = [
     description: "Prices stream over a Finnhub WebSocket proxy, with market-session detection for pre-market and after-hours.",
   },
   {
-    icon: Sparkles,
-    title: "AI research assistant",
-    description: "Ask about any stock. Answers combine price data, news, sentiment and web research, with cited sources.",
+    icon: Search,
+    title: "Stock research",
+    description: "Look up any US stock to see its price, key statistics and company profile.",
   },
   {
-    icon: Newspaper,
-    title: "News sentiment",
-    description: "Headlines are classified as positive, neutral or negative by an LLM, batched and cached for speed.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "Backtested predictions",
-    description: "An XGBoost model forecasts next-day returns and shows its walk-forward track record against simple baselines.",
+    icon: LineChart,
+    title: "Price charts",
+    description: "Interactive price history over one day, one week, one month or one year.",
   },
   {
     icon: Briefcase,
@@ -41,9 +36,14 @@ const features = [
     description: "Track holdings with live gain/loss and growth charts, and organise symbols into watchlists.",
   },
   {
+    icon: Newspaper,
+    title: "Market news",
+    description: "Recent headlines for the companies you follow, filtered by ticker.",
+  },
+  {
     icon: ShieldCheck,
     title: "Production-minded",
-    description: "JWT auth in HttpOnly cookies, background model retraining, Docker, and CI with tests, linting and builds.",
+    description: "JWT auth in HttpOnly cookies, database migrations, Docker, and CI with tests, linting and builds.",
   },
 ];
 
@@ -54,8 +54,6 @@ const techStack = [
   "FastAPI",
   "PostgreSQL",
   "SQLAlchemy",
-  "XGBoost",
-  "Groq LLM",
   "Finnhub",
   "Docker",
   "GitHub Actions",
@@ -72,7 +70,7 @@ export default async function Home() {
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <BarChart3 className="h-5 w-5" aria-hidden="true" />
             </span>
-            <span className="text-sm font-semibold">AI Stock Intelligence</span>
+            <span className="text-sm font-semibold">Stock Intelligence</span>
           </Link>
           <Button variant="ghost" size="sm" asChild>
             <Link href={user ? "/dashboard" : "/login"}>{user ? "Dashboard" : "Sign in"}</Link>
@@ -80,13 +78,13 @@ export default async function Home() {
         </header>
 
         <section className="py-16 text-center sm:py-24">
-          <p className="text-xs font-medium uppercase tracking-widest text-primary">Full-stack AI stock research platform</p>
+          <p className="text-xs font-medium uppercase tracking-widest text-primary">Full-stack stock research platform</p>
           <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-            Live prices, AI research and honestly backtested predictions in one dashboard
+            Live prices, stock research and portfolio tracking in one dashboard
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-muted-foreground">
-            Search any US stock, follow it in real time, read news with sentiment, ask an AI assistant that cites its
-            sources, and see how the prediction model has actually performed.
+            Search any US stock, follow it in real time, read the latest headlines, and track how your portfolio
+            and watchlists are performing.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             {user ? (
