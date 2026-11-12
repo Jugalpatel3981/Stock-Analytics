@@ -32,7 +32,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
 
         <SectionPanel
           title="Stock News"
-          description="Yahoo Finance headlines filtered by ticker"
+          description="Headlines from the past week, filtered by ticker"
           action={<Badge variant="secondary">Informational</Badge>}
         >
           <StockNewsFeed initialTicker={initialTicker} />

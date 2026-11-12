@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db_session
 from app.models.user import User
-from app.schemas.watchlist import WatchlistCreate, WatchlistRead, WatchlistStockCreate
+from app.schemas.watchlist import (
+    WatchlistCreate,
+    WatchlistRead,
+    WatchlistStockCreate,
+    WatchlistUpdate,
+)
 from app.services import watchlist_service
 
 router = APIRouter()
@@ -33,6 +38,28 @@ async def read_watchlist(
     session: AsyncSession = Depends(get_db_session),
 ) -> WatchlistRead:
     return await watchlist_service.get_watchlist(session, current_user.id, watchlist_id)
+
+
+@router.patch("/{watchlist_id}", response_model=WatchlistRead)
+async def rename_watchlist(
+    watchlist_id: int,
+    watchlist_update: WatchlistUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> WatchlistRead:
+    return await watchlist_service.rename_watchlist(
+        session, current_user.id, watchlist_id, watchlist_update.name
+    )
+
+
+@router.delete("/{watchlist_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_watchlist(
+    watchlist_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    await watchlist_service.delete_watchlist(session, current_user.id, watchlist_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

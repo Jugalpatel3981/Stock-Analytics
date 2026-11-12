@@ -68,9 +68,10 @@ data flow.
 
 | Key | Used for | Required? |
 | --- | --- | --- |
-| `FINNHUB_API_KEY` ([finnhub.io](https://finnhub.io)) | Real-time prices | Recommended |
+| `FINNHUB_API_KEY` ([finnhub.io](https://finnhub.io)) | Real-time prices, stock search and news | Recommended |
 
-The app still runs without the key. Live prices then show a clear "not configured" message.
+The app still runs without the key: live prices show a clear "not configured" message,
+and search only finds exact ticker symbols.
 
 ### Run with Docker
 
@@ -161,8 +162,8 @@ Interactive docs are available at `/docs` when the backend is running.
 | Stocks | `GET /stocks/search`, `GET /stocks/{ticker}`, `GET /stocks/{ticker}/history` |
 | News | `GET /stocks/news?ticker=NVDA` |
 | Market | `GET /market/quotes?symbols=NVDA,AAPL`, `WS /market/stream?symbols=NVDA,AAPL` |
-| Watchlists | `GET /watchlists`, `POST /watchlists`, `POST /watchlists/{id}/stocks` |
-| Portfolio | `GET /portfolio/holdings`, `GET /portfolio/growth` |
+| Watchlists | `GET /watchlists`, `POST /watchlists`, `PATCH /watchlists/{id}`, `DELETE /watchlists/{id}`, `POST /watchlists/{id}/stocks` |
+| Portfolio | `GET /portfolio/holdings`, `POST /portfolio/holdings`, `PATCH /portfolio/holdings/{id}`, `GET /portfolio/growth` |
 
 All paths are prefixed with `/api/v1`.
 

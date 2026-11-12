@@ -16,8 +16,8 @@ export default async function StocksPage() {
       <div className="space-y-5">
         <SectionPanel
           title="Stocks"
-          description="Search Yahoo Finance by company name or ticker"
-          action={<Badge variant="secondary">Yahoo Finance</Badge>}
+          description="Search by company name or ticker"
+          action={<Badge variant="secondary">US stocks and ETFs</Badge>}
         >
           <StockSearchForm />
         </SectionPanel>

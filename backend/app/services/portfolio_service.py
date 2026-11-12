@@ -12,13 +12,10 @@ from app.schemas.portfolio import (
     PortfolioGrowthResponse,
     PortfolioHoldingCreate,
     PortfolioHoldingRead,
+    PortfolioHoldingUpdate,
     PortfolioSummary,
 )
 from app.services import market_stream_service, stock_service
-
-
-def normalize_symbol(symbol: str) -> str:
-    return symbol.strip().upper()
 
 
 def build_holding_read(
@@ -106,9 +103,10 @@ async def create_holding(
     user_id: int,
     holding_create: PortfolioHoldingCreate,
 ) -> PortfolioHoldingRead:
+    symbol = await stock_service.ensure_ticker_exists(holding_create.symbol)
     holding = PortfolioHolding(
         user_id=user_id,
-        symbol=normalize_symbol(holding_create.symbol),
+        symbol=symbol,
         quantity=holding_create.quantity,
         buy_price=holding_create.buy_price,
         buy_date=holding_create.buy_date,
@@ -121,7 +119,9 @@ async def create_holding(
     return build_holding_read(holding, current_price)
 
 
-async def delete_holding(session: AsyncSession, user_id: int, holding_id: int) -> None:
+async def _get_owned_holding(
+    session: AsyncSession, user_id: int, holding_id: int
+) -> PortfolioHolding:
     result = await session.execute(
         select(PortfolioHolding).where(
             PortfolioHolding.id == holding_id,
@@ -136,6 +136,29 @@ async def delete_holding(session: AsyncSession, user_id: int, holding_id: int) -
             detail="Portfolio holding not found",
         )
 
+    return holding
+
+
+async def update_holding(
+    session: AsyncSession,
+    user_id: int,
+    holding_id: int,
+    holding_update: PortfolioHoldingUpdate,
+) -> PortfolioHoldingRead:
+    holding = await _get_owned_holding(session, user_id, holding_id)
+
+    for field, value in holding_update.model_dump(exclude_none=True).items():
+        setattr(holding, field, value)
+
+    await session.commit()
+    await session.refresh(holding)
+
+    current_price = await get_current_price(holding.symbol)
+    return build_holding_read(holding, current_price)
+
+
+async def delete_holding(session: AsyncSession, user_id: int, holding_id: int) -> None:
+    holding = await _get_owned_holding(session, user_id, holding_id)
     await session.delete(holding)
     await session.commit()
 

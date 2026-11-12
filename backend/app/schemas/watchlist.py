@@ -7,6 +7,10 @@ class WatchlistCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class WatchlistUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
 class WatchlistStockCreate(BaseModel):
     ticker: str = Field(min_length=1, max_length=12)
 

@@ -13,6 +13,7 @@ import { searchStocks, type StockSearchResult } from "@/lib/api";
 export function StockSearchForm() {
   const [results, setResults] = useState<StockSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
   const { showToast } = useToast();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -25,8 +26,10 @@ export function StockSearchForm() {
     try {
       const searchResults = await searchStocks(query);
       setResults(searchResults);
+      setSearchedQuery(query);
     } catch (caughtError) {
       setResults([]);
+      setSearchedQuery(null);
       showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to search stocks" });
     } finally {
       setIsSearching(false);
@@ -63,10 +66,14 @@ export function StockSearchForm() {
               <span className="font-semibold">{stock.ticker}</span>
               <span className="text-muted-foreground">{stock.company_name ?? "Company unavailable"}</span>
               <span>{stock.current_price ? `$${stock.current_price.toFixed(2)}` : "N/A"}</span>
-              <span className="text-muted-foreground">{stock.exchange ?? stock.currency ?? "Yahoo"}</span>
+              <span className="text-muted-foreground">{stock.exchange ?? stock.currency ?? ""}</span>
             </Link>
           ))}
         </div>
+      ) : searchedQuery !== null ? (
+        <p className="rounded-md border bg-background/40 px-4 py-6 text-center text-sm text-muted-foreground">
+          No stocks found for &quot;{searchedQuery}&quot;. Try the company name or its ticker symbol.
+        </p>
       ) : null}
     </div>
   );

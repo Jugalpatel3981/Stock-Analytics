@@ -71,10 +71,17 @@ Fast and slow data come from different sources so neither overwrites the other:
 | --- | --- | --- |
 | Last price, change | Finnhub WebSocket, proxied by the backend | Every trade |
 | Open, high, low, volume, previous close | Finnhub REST, with Yahoo fallback | 30-second cache |
-| Company profile, history, news | Yahoo Finance via `yfinance` | Per request |
+| Company profile, price history | Yahoo Finance via `yfinance` | Cached 1 to 15 minutes |
+| Stock search, company news | Finnhub REST | Cached 10 to 60 minutes |
+| Pre-market and after-hours price | Yahoo Finance, when Finnhub has no extended-hours trade | 30-second cache |
 
 `market/market_session.py` detects US pre-market, regular, after-hours and closed sessions in
-`America/New_York` time, so the UI can label prices correctly.
+`America/New_York` time, so the UI can label prices correctly. Outside regular hours the
+change is measured against the regular session price, not the previous day's close.
+
+Tickers are checked before they are saved to a watchlist or portfolio: Finnhub answers for
+US stocks and ETFs, and anything it does not price is checked against Yahoo Finance.
+Unknown tickers are remembered for ten minutes so repeat lookups fail fast.
 
 ## Testing and CI
 

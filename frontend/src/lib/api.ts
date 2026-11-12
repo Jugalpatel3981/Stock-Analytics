@@ -221,6 +221,19 @@ export function getWatchlists() {
   return apiRequest<Watchlist[]>("/watchlists");
 }
 
+export function renameWatchlist(watchlistId: number, input: { name: string }) {
+  return apiRequest<Watchlist>(`/watchlists/${watchlistId}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export function deleteWatchlist(watchlistId: number) {
+  return apiRequest<void>(`/watchlists/${watchlistId}`, {
+    method: "DELETE",
+  });
+}
+
 export function addStockToWatchlist(watchlistId: number, input: { ticker: string }) {
   return apiRequest<Watchlist>(`/watchlists/${watchlistId}/stocks`, {
     method: "POST",
@@ -250,6 +263,16 @@ export function createPortfolioHolding(input: {
 }) {
   return apiRequest<PortfolioHolding>("/portfolio/holdings", {
     method: "POST",
+    body: input,
+  });
+}
+
+export function updatePortfolioHolding(
+  holdingId: number,
+  input: { quantity?: number; buy_price?: number; buy_date?: string },
+) {
+  return apiRequest<PortfolioHolding>(`/portfolio/holdings/${holdingId}`, {
+    method: "PATCH",
     body: input,
   });
 }

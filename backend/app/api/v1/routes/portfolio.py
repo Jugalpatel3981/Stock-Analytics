@@ -7,6 +7,7 @@ from app.schemas.portfolio import (
     PortfolioGrowthResponse,
     PortfolioHoldingCreate,
     PortfolioHoldingRead,
+    PortfolioHoldingUpdate,
     PortfolioSummary,
 )
 from app.services import portfolio_service
@@ -29,6 +30,18 @@ async def create_holding(
     session: AsyncSession = Depends(get_db_session),
 ) -> PortfolioHoldingRead:
     return await portfolio_service.create_holding(session, current_user.id, holding_create)
+
+
+@router.patch("/holdings/{holding_id}", response_model=PortfolioHoldingRead)
+async def update_holding(
+    holding_id: int,
+    holding_update: PortfolioHoldingUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> PortfolioHoldingRead:
+    return await portfolio_service.update_holding(
+        session, current_user.id, holding_id, holding_update
+    )
 
 
 @router.delete("/holdings/{holding_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { LiveBadge } from "@/components/market/live-badge";
 import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
@@ -16,6 +16,7 @@ import {
   deletePortfolioHolding,
   getPortfolioGrowth,
   getPortfolioSummary,
+  updatePortfolioHolding,
   type PortfolioGrowthPoint,
   type PortfolioHolding,
   type PortfolioSummary,
@@ -40,6 +41,12 @@ function formatCurrency(value: number | null) {
   }).format(value);
 }
 
+// Today's date in the visitor's own time zone, as YYYY-MM-DD for <input type="date">.
+function todayIsoDate() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 function formatPercent(value: number | null) {
   if (value === null) {
     return "N/A";
@@ -54,6 +61,9 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
   const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeDelete, setActiveDelete] = useState<number | null>(null);
+  const [editingHoldingId, setEditingHoldingId] = useState<number | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const maxBuyDate = todayIsoDate();
   const trackedSymbols = Array.from(new Set(summary.holdings.map((holding) => holding.symbol)));
   const initialPrices = useMemo(
     () =>
@@ -116,7 +126,32 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
     }
   }
 
-  async function handleDeleteHolding(holdingId: number) {
+  async function handleUpdateHolding(event: FormEvent<HTMLFormElement>, holdingId: number) {
+    event.preventDefault();
+    setIsSavingEdit(true);
+
+    const formData = new FormData(event.currentTarget);
+
+    try {
+      await updatePortfolioHolding(holdingId, {
+        quantity: Number(formData.get("quantity")),
+        buy_price: Number(formData.get("buy_price")),
+        buy_date: String(formData.get("buy_date")),
+      });
+      await refreshPortfolio();
+      setEditingHoldingId(null);
+    } catch (caughtError) {
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to update holding" });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteHolding(holdingId: number, symbol: string) {
+    if (!window.confirm(`Remove this ${symbol} holding from your portfolio?`)) {
+      return;
+    }
+
     setActiveDelete(holdingId);
 
     try {
@@ -189,7 +224,7 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
           <Input className="uppercase" name="symbol" placeholder="Symbol" maxLength={12} required />
           <Input name="quantity" type="number" step="0.0001" min="0.0001" placeholder="Quantity" required />
           <Input name="buy_price" type="number" step="0.01" min="0.01" placeholder="Buy Price" required />
-          <Input name="buy_date" type="date" required />
+          <Input name="buy_date" type="date" max={maxBuyDate} aria-label="Buy date" required />
           <Button type="submit" disabled={isSubmitting}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             {isSubmitting ? "Adding..." : "Add"}
@@ -235,43 +270,103 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
               <span>Gain/Loss</span>
               <span>Return</span>
               <span>Buy Date</span>
-              <span className="text-right">Action</span>
+              <span className="text-right">Actions</span>
             </div>
             {summary.holdings.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">No holdings added yet.</div>
             ) : (
-              liveHoldings.map((holding) => (
-                <div
-                  key={holding.id}
-                  className="grid grid-cols-[0.8fr_0.8fr_0.9fr_0.9fr_1fr_1fr_1fr_0.9fr_0.7fr] items-center border-t px-4 py-4 text-sm"
-                >
-                  <Link className="font-semibold text-primary hover:underline" href={`/stocks/${holding.symbol}`}>
-                    {holding.symbol}
-                  </Link>
-                  <span>{holding.quantity}</span>
-                  <span>{formatCurrency(holding.buy_price)}</span>
-                  <span>{formatCurrency(holding.current_price)}</span>
-                  <span>{formatCurrency(holding.current_value)}</span>
-                  <span className={(holding.gain_loss ?? 0) >= 0 ? "font-medium text-emerald-400" : "font-medium text-red-400"}>
-                    {formatCurrency(holding.gain_loss)}
-                  </span>
-                  <span className={(holding.percentage_return ?? 0) >= 0 ? "font-medium text-emerald-400" : "font-medium text-red-400"}>
-                    {formatPercent(holding.percentage_return)}
-                  </span>
-                  <span className="text-muted-foreground">{holding.buy_date}</span>
-                  <span className="text-right">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteHolding(holding.id)}
-                      disabled={activeDelete === holding.id}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </span>
-                </div>
-              ))
+              liveHoldings.map((holding) =>
+                editingHoldingId === holding.id ? (
+                  <form
+                    key={holding.id}
+                    className="grid grid-cols-[0.8fr_0.8fr_0.9fr_0.9fr_1fr_1fr_1fr_0.9fr_0.7fr] items-center gap-x-2 border-t bg-secondary/40 px-4 py-3 text-sm"
+                    onSubmit={(event) => handleUpdateHolding(event, holding.id)}
+                  >
+                    <span className="font-semibold text-primary">{holding.symbol}</span>
+                    <Input
+                      aria-label="Quantity"
+                      className="h-9"
+                      defaultValue={holding.quantity}
+                      min="0.0001"
+                      name="quantity"
+                      required
+                      step="0.0001"
+                      type="number"
+                    />
+                    <Input
+                      aria-label="Buy price"
+                      className="h-9"
+                      defaultValue={holding.buy_price}
+                      min="0.01"
+                      name="buy_price"
+                      required
+                      step="0.01"
+                      type="number"
+                    />
+                    <span className="col-span-4 text-xs text-muted-foreground">Change the quantity, buy price or buy date, then save.</span>
+                    <Input
+                      aria-label="Buy date"
+                      className="h-9"
+                      defaultValue={holding.buy_date}
+                      max={maxBuyDate}
+                      name="buy_date"
+                      required
+                      type="date"
+                    />
+                    <span className="flex justify-end">
+                      <Button type="submit" size="sm" variant="ghost" disabled={isSavingEdit} aria-label="Save changes" title="Save">
+                        <Check className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setEditingHoldingId(null)} aria-label="Cancel" title="Cancel">
+                        <X className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </span>
+                  </form>
+                ) : (
+                  <div
+                    key={holding.id}
+                    className="grid grid-cols-[0.8fr_0.8fr_0.9fr_0.9fr_1fr_1fr_1fr_0.9fr_0.7fr] items-center border-t px-4 py-4 text-sm"
+                  >
+                    <Link className="font-semibold text-primary hover:underline" href={`/stocks/${holding.symbol}`}>
+                      {holding.symbol}
+                    </Link>
+                    <span>{holding.quantity}</span>
+                    <span>{formatCurrency(holding.buy_price)}</span>
+                    <span>{formatCurrency(holding.current_price)}</span>
+                    <span>{formatCurrency(holding.current_value)}</span>
+                    <span className={(holding.gain_loss ?? 0) >= 0 ? "font-medium text-emerald-400" : "font-medium text-red-400"}>
+                      {formatCurrency(holding.gain_loss)}
+                    </span>
+                    <span className={(holding.percentage_return ?? 0) >= 0 ? "font-medium text-emerald-400" : "font-medium text-red-400"}>
+                      {formatPercent(holding.percentage_return)}
+                    </span>
+                    <span className="text-muted-foreground">{holding.buy_date}</span>
+                    <span className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingHoldingId(holding.id)}
+                        aria-label={`Edit ${holding.symbol} holding`}
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteHolding(holding.id, holding.symbol)}
+                        disabled={activeDelete === holding.id}
+                        aria-label={`Remove ${holding.symbol} holding`}
+                        title="Remove"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </span>
+                  </div>
+                ),
+              )
             )}
           </div>
         </div>

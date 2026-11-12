@@ -194,6 +194,51 @@ def enrich_with_yfinance_market_stats(
     )
 
 
+def enrich_with_yfinance_extended_hours(
+    quote: MarketQuote, stats: dict[str, float | int | None] | None
+) -> MarketQuote:
+    """Fill in the pre-market or after-hours price when Finnhub only has the regular close.
+
+    The change is measured against the regular session price, so an after-hours move is
+    not mixed up with the day's regular move.
+    """
+    if (
+        quote.has_extended_hours_activity
+        or quote.market_session not in ("PRE_MARKET", "AFTER_HOURS")
+        or not stats
+    ):
+        return quote
+
+    key = "pre_market_price" if quote.market_session == "PRE_MARKET" else "post_market_price"
+    extended_price = to_float(stats.get(key))
+    if extended_price is None or extended_price <= 0:
+        return quote
+
+    if quote.market_session == "PRE_MARKET":
+        regular_price = quote.previous_close or to_float(stats.get("previous_close"))
+    else:
+        regular_price = to_float(stats.get("regular_price")) or quote.regular_price
+
+    change = extended_price - regular_price if regular_price else None
+    change_percent = (
+        (change / regular_price) * 100 if change is not None and regular_price else None
+    )
+
+    return quote.model_copy(
+        update={
+            "current_price": extended_price,
+            "change": change,
+            "change_percent": change_percent,
+            "regular_price": regular_price,
+            "extended_hours_price": extended_price,
+            "has_extended_hours_activity": True,
+            "extended_hours_status": "ACTIVE",
+            "extended_hours_source": "Yahoo Finance",
+            "source": "Finnhub + yfinance",
+        }
+    )
+
+
 async def _fetch_yfinance_market_stats(
     symbols: list[str],
 ) -> dict[str, dict[str, float | int | None]]:
@@ -432,20 +477,30 @@ async def get_finnhub_quotes(symbols: list[str]) -> list[MarketQuote]:
             for symbol, quote in quotes_by_symbol.items()
             if quote.volume is None or quote.open is None or quote.high is None or quote.low is None
         ]
-        if symbols_needing_yfinance_fallback:
-            yfinance_stats = await _fetch_yfinance_market_stats(symbols_needing_yfinance_fallback)
-            for symbol in symbols_needing_yfinance_fallback:
-                quote = quotes_by_symbol.get(symbol)
-                if quote is not None:
-                    quotes_by_symbol[symbol] = enrich_with_yfinance_market_stats(
-                        quote, yfinance_stats.get(symbol)
-                    )
-
         for symbol in symbols_needing_extended_fallback:
             quote = quotes_by_symbol.get(symbol)
             if quote is not None:
                 quotes_by_symbol[symbol] = enrich_with_yahoo_extended_hours(
                     quote, yahoo_quotes.get(symbol)
                 )
+
+        symbols_still_waiting_for_extended_price = [
+            symbol
+            for symbol in symbols_needing_extended_fallback
+            if symbol in quotes_by_symbol
+            and not quotes_by_symbol[symbol].has_extended_hours_activity
+        ]
+        yfinance_symbols = sorted(
+            set(symbols_needing_yfinance_fallback + symbols_still_waiting_for_extended_price)
+        )
+        if yfinance_symbols:
+            yfinance_stats = await _fetch_yfinance_market_stats(yfinance_symbols)
+            for symbol in yfinance_symbols:
+                quote = quotes_by_symbol.get(symbol)
+                if quote is not None:
+                    quote = enrich_with_yfinance_market_stats(quote, yfinance_stats.get(symbol))
+                    quotes_by_symbol[symbol] = enrich_with_yfinance_extended_hours(
+                        quote, yfinance_stats.get(symbol)
+                    )
 
     return [quotes_by_symbol[symbol] for symbol in symbols if symbol in quotes_by_symbol]

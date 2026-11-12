@@ -214,3 +214,61 @@ def test_yahoo_market_stats_fallback_fills_volume_and_day_stats() -> None:
     assert enriched_quote.low == 192.8
     assert enriched_quote.previous_close == 197.58
     assert enriched_quote.source == "Finnhub + Yahoo Finance"
+
+
+def test_yfinance_extended_hours_measures_change_against_the_regular_close() -> None:
+    from app.market.rest_market_service import enrich_with_yfinance_extended_hours
+
+    quote = MarketQuote(
+        symbol="MSFT",
+        current_price=521.13,
+        change=-12.03,
+        change_percent=-2.2573,
+        previous_close=533.16,
+        regular_price=521.13,
+        market_session="AFTER_HOURS",
+        extended_hours_status="WAITING",
+        timestamp="2026-11-11T21:00:00+00:00",
+    )
+
+    enriched = enrich_with_yfinance_extended_hours(
+        quote, {"regular_price": 521.13, "post_market_price": 522.05, "previous_close": 533.16}
+    )
+
+    assert enriched.current_price == 522.05
+    assert enriched.extended_hours_price == 522.05
+    assert enriched.regular_price == 521.13
+    assert enriched.has_extended_hours_activity is True
+    assert enriched.extended_hours_status == "ACTIVE"
+    # Up 0.92 from the regular close, even though the stock fell during the day.
+    assert round(enriched.change, 2) == 0.92
+    assert round(enriched.change_percent, 2) == 0.18
+
+
+def test_yfinance_extended_hours_leaves_quote_alone_without_an_extended_price() -> None:
+    from app.market.rest_market_service import enrich_with_yfinance_extended_hours
+
+    quote = MarketQuote(
+        symbol="AMZN",
+        current_price=266.17,
+        regular_price=266.17,
+        market_session="AFTER_HOURS",
+        extended_hours_status="WAITING",
+        timestamp="2026-11-11T21:00:00+00:00",
+    )
+
+    assert enrich_with_yfinance_extended_hours(quote, {"post_market_price": None}) == quote
+    assert enrich_with_yfinance_extended_hours(quote, None) == quote
+
+
+def test_yfinance_extended_hours_is_ignored_during_regular_trading() -> None:
+    from app.market.rest_market_service import enrich_with_yfinance_extended_hours
+
+    quote = MarketQuote(
+        symbol="AMZN",
+        current_price=266.17,
+        market_session="OPEN",
+        timestamp="2026-11-11T16:00:00+00:00",
+    )
+
+    assert enrich_with_yfinance_extended_hours(quote, {"post_market_price": 270.0}) == quote

@@ -45,8 +45,18 @@ function formatAxisLabel(timestamp: string, range: StockHistoryRange) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function latestPoint(prices: HistoricalPricePoint[]) {
-  return prices.length > 0 ? prices[prices.length - 1] : null;
+// Open, high, low and close for the whole selected range, not just its last bar.
+function summarizeRange(prices: HistoricalPricePoint[]) {
+  if (prices.length === 0) {
+    return null;
+  }
+
+  return {
+    open: prices[0].open,
+    high: Math.max(...prices.map((price) => price.high)),
+    low: Math.min(...prices.map((price) => price.low)),
+    close: prices[prices.length - 1].close,
+  };
 }
 
 export function StockPriceChart({ ticker }: StockPriceChartProps) {
@@ -95,14 +105,14 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
     [prices, selectedRange],
   );
 
-  const latest = latestPoint(prices);
+  const summary = useMemo(() => summarizeRange(prices), [prices]);
 
   return (
     <section className="rounded-lg border bg-card/80">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-base font-semibold">Historical Price Chart</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Open, high, low, close price visualization</p>
+          <p className="mt-1 text-sm text-muted-foreground">Open, high, low and close for the selected period</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
           {ranges.map((range) => (
@@ -122,10 +132,10 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
       <div className="p-5">
         <div className="mb-4 grid gap-3 sm:grid-cols-4">
           {[
-            { label: "Open", value: latest?.open },
-            { label: "High", value: latest?.high },
-            { label: "Low", value: latest?.low },
-            { label: "Close", value: latest?.close },
+            { label: "Open", value: summary?.open },
+            { label: "High", value: summary?.high },
+            { label: "Low", value: summary?.low },
+            { label: "Close", value: summary?.close },
           ].map((item) => (
             <div key={item.label} className="rounded-md border bg-background/40 p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">{item.label}</p>

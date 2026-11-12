@@ -157,78 +157,209 @@ def test_read_stock_news(monkeypatch) -> None:
     assert payload["articles"][0]["source"] == "Yahoo Finance"
 
 
-def test_search_stocks_by_company_name(monkeypatch) -> None:
-    class FakeResponse:
-        def raise_for_status(self) -> None:
-            return None
+def _use_finnhub(monkeypatch, responses: dict[str, object]) -> list[tuple[str, dict]]:
+    """Pretend a Finnhub key is configured and answer requests from `responses` by path."""
+    from app.core.config import get_settings
 
-        def json(self) -> dict[str, object]:
+    calls: list[tuple[str, dict]] = []
+
+    async def fake_finnhub_get(path: str, params: dict):
+        calls.append((path, params))
+        response = responses[path]
+        return response(params) if callable(response) else response
+
+    monkeypatch.setattr(get_settings(), "finnhub_api_key", "test-key")
+    monkeypatch.setattr(stock_service, "_finnhub_get", fake_finnhub_get)
+    return calls
+
+
+async def test_search_uses_finnhub_and_skips_duplicates_and_unsupported_types(monkeypatch) -> None:
+    _use_finnhub(
+        monkeypatch,
+        {
+            "/search": {
+                "count": 4,
+                "result": [
+                    {"symbol": "DIS", "description": "WALT DISNEY CO/THE", "type": "Common Stock"},
+                    {"symbol": "DIS", "description": "WALT DISNEY CO/THE", "type": "Common Stock"},
+                    {"symbol": "DISW", "description": "Disney warrant", "type": "Warrant"},
+                    {"symbol": "SPY", "description": "SPDR S&P 500 ETF Trust", "type": "ETP"},
+                ],
+            },
+            "/quote": {"c": 101.5},
+        },
+    )
+
+    results = await stock_service.search_stocks("disney")
+
+    assert [result.ticker for result in results] == ["DIS", "SPY"]
+    assert results[0].company_name == "The Walt Disney Co"
+    assert results[0].current_price == 101.5
+    assert results[1].company_name == "SPDR S&P 500 ETF Trust"
+
+
+async def test_search_retries_with_other_spellings(monkeypatch) -> None:
+    def search(params: dict) -> dict:
+        if params["q"] == "coca-cola":
             return {
-                "quotes": [
-                    {
-                        "symbol": "NVDA",
-                        "quoteType": "EQUITY",
-                        "longname": "NVIDIA Corporation",
-                        "exchange": "NMS",
-                        "currency": "USD",
-                        "regularMarketPrice": 210.73,
-                    },
-                    {
-                        "symbol": "NVDA",
-                        "quoteType": "EQUITY",
-                        "longname": "NVIDIA Corporation",
-                    },
-                    {
-                        "symbol": "NVDA240621C00100000",
-                        "quoteType": "OPTION",
-                    },
-                ]
+                "result": [{"symbol": "KO", "description": "Coca-Cola Co", "type": "Common Stock"}]
             }
+        return {"result": []}
 
-    def fake_get(url: str, params: dict[str, object], timeout: int) -> FakeResponse:
-        assert params["q"] == "nvidia"
-        assert params["quotesCount"] == 8
-        return FakeResponse()
+    calls = _use_finnhub(monkeypatch, {"/search": search, "/quote": {"c": 70.0}})
 
-    monkeypatch.setattr("httpx.get", fake_get)
+    results = await stock_service.search_stocks("coca cola")
 
-    results = stock_service._search_stocks("nvidia")
-
-    assert len(results) == 1
-    assert results[0].ticker == "NVDA"
-    assert results[0].company_name == "NVIDIA Corporation"
-    assert results[0].current_price == 210.73
+    assert [result.ticker for result in results] == ["KO"]
+    searched = [params["q"] for path, params in calls if path == "/search"]
+    assert searched == ["coca cola", "coca-cola"]
 
 
-def test_search_stocks_uses_company_alias_when_yahoo_search_is_empty(monkeypatch) -> None:
-    class FakeResponse:
-        def raise_for_status(self) -> None:
-            return None
+async def test_search_returns_no_results_instead_of_an_error(monkeypatch) -> None:
+    _use_finnhub(monkeypatch, {"/search": {"count": 0, "result": []}})
 
-        def json(self) -> dict[str, object]:
-            return {"quotes": []}
+    assert await stock_service.search_stocks("zzzzqq") == []
 
-    def fake_get(url: str, params: dict[str, object], timeout: int) -> FakeResponse:
-        return FakeResponse()
+
+async def test_search_falls_back_to_company_alias_without_finnhub(monkeypatch) -> None:
+    from app.core.config import get_settings
 
     def fake_build_stock_detail(ticker: str) -> StockDetail:
         assert ticker == "NVDA"
-        return StockDetail(
-            ticker="NVDA",
-            company_name="NVIDIA Corporation",
-            exchange="NMS",
-            currency="USD",
-            current_price=210.73,
-        )
+        return StockDetail(ticker="NVDA", company_name="NVIDIA Corporation", current_price=210.73)
 
-    monkeypatch.setattr("httpx.get", fake_get)
+    monkeypatch.setattr(get_settings(), "finnhub_api_key", None)
     monkeypatch.setattr(stock_service, "_build_stock_detail", fake_build_stock_detail)
 
-    results = stock_service._search_stocks("nvidia")
+    results = await stock_service.search_stocks("nvidia")
 
     assert len(results) == 1
     assert results[0].ticker == "NVDA"
     assert results[0].company_name == "NVIDIA Corporation"
+
+
+async def test_news_comes_from_finnhub_newest_first_without_duplicates(monkeypatch) -> None:
+    calls = _use_finnhub(
+        monkeypatch,
+        {
+            "/company-news": [
+                {"headline": "Older story", "source": "CNBC", "datetime": 1794000000},
+                {"headline": "Newest story", "source": "Yahoo", "datetime": 1794400000},
+                {"headline": "newest story", "source": "Benzinga", "datetime": 1794300000},
+                {"headline": "", "datetime": 1794500000},
+            ]
+        },
+    )
+
+    news = await stock_service.get_stock_news("aapl", 5)
+
+    assert news.ticker == "AAPL"
+    assert news.data_source == "Finnhub"
+    assert [article.headline for article in news.articles] == ["Newest story", "Older story"]
+    assert news.articles[0].source == "Yahoo"
+    assert news.articles[0].publish_date.startswith("2026-")
+    assert calls[0][1]["symbol"] == "AAPL"
+
+
+async def test_news_repairs_text_with_broken_encoding(monkeypatch) -> None:
+    broken = "Apple’s market cap".encode().decode("latin-1")
+    assert broken != "Apple’s market cap"
+    _use_finnhub(
+        monkeypatch,
+        {
+            "/company-news": [
+                {"headline": "Plain café headline", "summary": broken, "datetime": 2},
+                {"headline": broken, "summary": "ok", "datetime": 1},
+            ]
+        },
+    )
+
+    news = await stock_service.get_stock_news("AAPL", 5)
+
+    assert news.articles[0].headline == "Plain café headline"
+    assert news.articles[0].summary == "Apple’s market cap"
+    assert news.articles[1].headline == "Apple’s market cap"
+
+
+async def test_news_respects_the_limit(monkeypatch) -> None:
+    _use_finnhub(
+        monkeypatch,
+        {"/company-news": [{"headline": f"Story {n}", "datetime": n} for n in range(1, 30)]},
+    )
+
+    news = await stock_service.get_stock_news("AAPL", 3)
+
+    assert [article.headline for article in news.articles] == ["Story 29", "Story 28", "Story 27"]
+
+
+async def test_news_provider_failure_is_reported_not_hidden(monkeypatch) -> None:
+    import pytest
+    from fastapi import HTTPException
+
+    def broken(_params: dict):
+        raise ConnectionError("finnhub down")
+
+    _use_finnhub(monkeypatch, {"/company-news": broken})
+
+    with pytest.raises(HTTPException) as caught:
+        await stock_service.get_stock_news("AAPL", 5)
+
+    assert caught.value.status_code == 502
+
+
+async def test_ensure_ticker_exists_accepts_a_symbol_finnhub_prices(monkeypatch) -> None:
+    def must_not_call_yahoo(_ticker: str):
+        raise AssertionError("Yahoo should not be needed")
+
+    _use_finnhub(monkeypatch, {"/quote": {"c": 355.6}})
+    monkeypatch.setattr(stock_service, "_build_stock_detail", must_not_call_yahoo)
+
+    assert await stock_service.ensure_ticker_exists(" aapl ") == "AAPL"
+
+
+async def test_ensure_ticker_exists_checks_yahoo_when_finnhub_has_no_price(monkeypatch) -> None:
+    _use_finnhub(monkeypatch, {"/quote": {"c": 0}})
+    monkeypatch.setattr(
+        stock_service,
+        "_build_stock_detail",
+        lambda ticker: StockDetail(ticker=ticker, company_name="Bitcoin USD", current_price=7.0),
+    )
+
+    assert await stock_service.ensure_ticker_exists("btc-usd") == "BTC-USD"
+
+
+async def test_ensure_ticker_exists_rejects_unknown_and_remembers_it(monkeypatch) -> None:
+    import pytest
+    from fastapi import HTTPException, status
+
+    yahoo_calls = []
+
+    def unknown(ticker: str):
+        yahoo_calls.append(ticker)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+    _use_finnhub(monkeypatch, {"/quote": {"c": 0}})
+    monkeypatch.setattr(stock_service, "_build_stock_detail", unknown)
+
+    for _attempt in range(2):
+        with pytest.raises(HTTPException) as caught:
+            await stock_service.ensure_ticker_exists("ZZZZQ")
+        assert caught.value.status_code == 404
+
+    assert len(yahoo_calls) == 1
+
+
+async def test_ensure_ticker_exists_rejects_malformed_symbols_without_a_lookup(monkeypatch) -> None:
+    import pytest
+    from fastapi import HTTPException
+
+    calls = _use_finnhub(monkeypatch, {"/quote": {"c": 1.0}})
+
+    with pytest.raises(HTTPException) as caught:
+        await stock_service.ensure_ticker_exists("NOT A TICKER!")
+
+    assert caught.value.status_code == 404
+    assert calls == []
 
 
 async def test_yahoo_failures_become_bad_gateway(monkeypatch) -> None:

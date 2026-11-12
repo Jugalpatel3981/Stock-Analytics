@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 import { LiveBadge } from "@/components/market/live-badge";
 import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
@@ -14,7 +14,9 @@ import { useToast } from "@/components/ui/toast-provider";
 import {
   addStockToWatchlist,
   createWatchlist,
+  deleteWatchlist,
   removeStockFromWatchlist,
+  renameWatchlist,
   searchStocks,
   type Watchlist,
   type StockSearchResult,
@@ -33,6 +35,8 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
   const [activeMutation, setActiveMutation] = useState<string | null>(null);
   const [searchResultsByWatchlist, setSearchResultsByWatchlist] = useState<Record<number, StockSearchResult[]>>({});
   const [searchingWatchlistId, setSearchingWatchlistId] = useState<number | null>(null);
+  const [renamingWatchlistId, setRenamingWatchlistId] = useState<number | null>(null);
+  const [noResultsByWatchlist, setNoResultsByWatchlist] = useState<Record<number, string | null>>({});
   const trackedSymbols = Array.from(new Set(watchlists.flatMap((watchlist) => watchlist.stocks.map((stock) => stock.ticker))));
   const { quotes, status, error: streamError, lastUpdated, marketSession, nextMarketOpen, hasExtendedHoursActivity } = useMarketStream(trackedSymbols);
 
@@ -52,6 +56,47 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
       showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to create watchlist" });
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleRenameWatchlist(event: FormEvent<HTMLFormElement>, watchlistId: number) {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
+    if (!name) {
+      return;
+    }
+
+    setActiveMutation(`rename-${watchlistId}`);
+
+    try {
+      const updatedWatchlist = await renameWatchlist(watchlistId, { name });
+      setWatchlists((current) =>
+        current.map((watchlist) => (watchlist.id === watchlistId ? updatedWatchlist : watchlist)),
+      );
+      setRenamingWatchlistId(null);
+    } catch (caughtError) {
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to rename watchlist" });
+    } finally {
+      setActiveMutation(null);
+    }
+  }
+
+  async function handleDeleteWatchlist(watchlist: Watchlist) {
+    const stockCount = watchlist.stocks.length;
+    const detail = stockCount > 0 ? ` and the ${stockCount} ${stockCount === 1 ? "stock" : "stocks"} in it` : "";
+    if (!window.confirm(`Delete the watchlist "${watchlist.name}"${detail}? This cannot be undone.`)) {
+      return;
+    }
+
+    setActiveMutation(`delete-${watchlist.id}`);
+
+    try {
+      await deleteWatchlist(watchlist.id);
+      setWatchlists((current) => current.filter((item) => item.id !== watchlist.id));
+    } catch (caughtError) {
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to delete watchlist" });
+    } finally {
+      setActiveMutation(null);
     }
   }
 
@@ -114,6 +159,7 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
     try {
       const results = await searchStocks(query);
       setSearchResultsByWatchlist((current) => ({ ...current, [watchlistId]: results }));
+      setNoResultsByWatchlist((current) => ({ ...current, [watchlistId]: results.length === 0 ? query : null }));
     } catch (caughtError) {
       setSearchResultsByWatchlist((current) => ({ ...current, [watchlistId]: [] }));
       showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to search stocks" });
@@ -154,7 +200,7 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-base font-semibold">Create Watchlist</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Group tickers for research, monitoring, and future alerts.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Group the stocks you want to follow.</p>
           </div>
           <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCreateWatchlist}>
             <Input name="name" placeholder="Growth Stocks" minLength={1} maxLength={120} required />
@@ -176,10 +222,55 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
           {watchlists.map((watchlist) => (
             <section key={watchlist.id} className="rounded-lg border bg-card/80">
               <div className="border-b p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-semibold">{watchlist.name}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{watchlist.stocks.length} stocks tracked</p>
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+                  <div className="min-w-[14rem] flex-1">
+                    {renamingWatchlistId === watchlist.id ? (
+                      <form className="flex items-center gap-2" onSubmit={(event) => handleRenameWatchlist(event, watchlist.id)}>
+                        <Input
+                          aria-label="Watchlist name"
+                          autoFocus
+                          className="h-9"
+                          defaultValue={watchlist.name}
+                          maxLength={120}
+                          name="name"
+                          required
+                        />
+                        <Button type="submit" size="sm" disabled={activeMutation === `rename-${watchlist.id}`} aria-label="Save name">
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setRenamingWatchlistId(null)} aria-label="Cancel rename">
+                          <X className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </form>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <h2 className="truncate text-base font-semibold">{watchlist.name}</h2>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRenamingWatchlistId(watchlist.id)}
+                          aria-label={`Rename ${watchlist.name}`}
+                          title="Rename watchlist"
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteWatchlist(watchlist)}
+                          disabled={activeMutation === `delete-${watchlist.id}`}
+                          aria-label={`Delete ${watchlist.name}`}
+                          title="Delete watchlist"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-400" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    )}
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {watchlist.stocks.length} {watchlist.stocks.length === 1 ? "stock" : "stocks"} tracked
+                    </p>
                   </div>
                   <LiveBadge
                     status={status}
@@ -209,7 +300,7 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
                       >
                         <div>
                           <p className="font-semibold text-primary">{result.ticker}</p>
-                          <p className="text-xs text-muted-foreground">{result.exchange ?? result.currency ?? "Yahoo"}</p>
+                          <p className="text-xs text-muted-foreground">{result.current_price ? `$${result.current_price.toFixed(2)}` : result.currency ?? ""}</p>
                         </div>
                         <p className="text-muted-foreground">{result.company_name ?? "Company unavailable"}</p>
                         <Button
@@ -225,6 +316,10 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
                       </div>
                     ))}
                   </div>
+                ) : noResultsByWatchlist[watchlist.id] ? (
+                  <p className="mt-3 rounded-md border bg-background/40 px-3 py-3 text-sm text-muted-foreground">
+                    No stocks found for &quot;{noResultsByWatchlist[watchlist.id]}&quot;.
+                  </p>
                 ) : null}
               </div>
 
@@ -239,7 +334,6 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
                           <Link className="font-semibold text-primary hover:underline" href={`/stocks/${stock.ticker}`}>
                             {stock.ticker}
                           </Link>
-                          <p className="text-xs text-muted-foreground">Live gain/loss indicator</p>
                         </div>
                         <LivePrice quote={quotes[stock.ticker]} compact />
                         <Button

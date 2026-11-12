@@ -191,7 +191,10 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
           const hasExtendedActivity = previous?.hasExtendedHoursActivity || hasTradeExtendedHoursActivity;
           const quoteMarketSession = previous?.marketSession ?? "CLOSED";
           const quoteNextMarketOpen = previous?.nextMarketOpen ?? null;
-          const changeBase = previousClose ?? initialPrice ?? previousPrice;
+          // Before and after the regular session, measure the move against the regular
+          // session price rather than the previous day's close.
+          const isExtendedSession = quoteMarketSession === "PRE_MARKET" || quoteMarketSession === "AFTER_HOURS";
+          const changeBase = (isExtendedSession ? regularPrice : null) ?? previousClose ?? initialPrice ?? previousPrice;
           const change = changeBase !== null ? price - changeBase : null;
           const changePercent = changeBase ? ((change ?? 0) / changeBase) * 100 : null;
           const nextQuote: LiveQuote = {

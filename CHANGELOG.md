@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Rename and delete watchlists, and edit a holding's quantity, buy price and buy date.
+- A "no stocks found" message for searches without results.
+
+### Changed
+- Stock search and company news now use Finnhub. Search finds companies by name
+  (for example "disney" or "coca cola") instead of only exact tickers.
+- The open, high, low and close boxes above the price chart describe the whole selected
+  period instead of its last bar.
+
+### Fixed
+- News was empty because the Yahoo Finance news feed stopped responding.
+- Tickers that do not exist could be saved to watchlists and portfolios.
+- Holdings could be saved with a buy date in the future.
+- Two watchlists could share the same name.
+- After-hours and pre-market changes were measured against the previous day's close, and
+  pages disagreed about the price until a live trade arrived.
+- Passwords made only of digits or only of letters were accepted.
+- The frontend container always reported "unhealthy".
+- The backend logged an "Event loop is closed" error on every start.
+
 ### Removed
 - The AI assistant, news sentiment and price prediction features, with their database
   tables (migration `0003`), settings and dependencies. The prediction model did not beat

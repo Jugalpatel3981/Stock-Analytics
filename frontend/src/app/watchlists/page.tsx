@@ -34,7 +34,7 @@ export default async function WatchlistsPage() {
           <p className="text-xs font-medium uppercase text-muted-foreground">Personal research lists</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-normal">Watchlists</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Create focused lists of tickers, add stocks, and jump into detailed Yahoo Finance research pages.
+            Create focused lists of tickers, add stocks, and jump into detailed research pages.
           </p>
         </div>
         <WatchlistManager initialWatchlists={watchlists} />

@@ -1,7 +1,8 @@
 import asyncio
 import logging
+import re
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -9,6 +10,7 @@ import yfinance as yf
 from fastapi import HTTPException, status
 
 from app.core.cache import TTLCache
+from app.core.config import get_settings
 from app.schemas.stock import (
     HistoricalPricePoint,
     StockDetail,
@@ -23,7 +25,13 @@ logger = logging.getLogger(__name__)
 # Upper bound for one yfinance call, so a slow provider cannot stall whole pages.
 YAHOO_TIMEOUT_SECONDS = 12
 
-YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
+FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
+FINNHUB_TIMEOUT_SECONDS = 10
+# Finnhub security types that the app can show a detail page for.
+FINNHUB_SEARCH_TYPES = {"Common Stock", "ETP", "ADR", "REIT"}
+MAX_SEARCH_RESULTS = 6
+NEWS_LOOKBACK_DAYS = 7
+TICKER_PATTERN = re.compile(r"[A-Z0-9^][A-Z0-9.\-=^]{0,11}")
 
 COMPANY_SYMBOL_ALIASES = {
     "alphabet": "GOOGL",
@@ -49,6 +57,7 @@ _market_stats_cache = TTLCache(ttl_seconds=30)
 _history_cache = TTLCache(ttl_seconds=15 * 60)
 _news_cache = TTLCache(ttl_seconds=10 * 60)
 _search_cache = TTLCache(ttl_seconds=60 * 60)
+_unknown_ticker_cache = TTLCache(ttl_seconds=10 * 60)
 INTRADAY_HISTORY_TTL_SECONDS = 60
 
 HISTORY_RANGES = {
@@ -61,6 +70,37 @@ HISTORY_RANGES = {
 
 def normalize_ticker(ticker: str) -> str:
     return ticker.strip().upper()
+
+
+async def _finnhub_get(path: str, params: dict[str, Any]) -> Any:
+    """Call the Finnhub REST API. Raises if no API key is configured or the call fails."""
+    api_key = get_settings().finnhub_api_key
+    if not api_key:
+        raise RuntimeError("Finnhub API key is not configured.")
+
+    async with httpx.AsyncClient(timeout=FINNHUB_TIMEOUT_SECONDS) as client:
+        response = await client.get(
+            f"{FINNHUB_BASE_URL}{path}", params={**params, "token": api_key}
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def _finnhub_price(symbol: str) -> float | None:
+    try:
+        payload = await _finnhub_get("/quote", {"symbol": symbol})
+    except Exception:
+        return None
+
+    price = _to_float(payload.get("c")) if isinstance(payload, dict) else None
+    return price if price and price > 0 else None
+
+
+def _not_found(normalized_ticker: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Stock ticker '{normalized_ticker}' was not found",
+    )
 
 
 def _read_fast_info_value(fast_info: Any, key: str) -> Any:
@@ -136,10 +176,7 @@ def _build_stock_detail(ticker: str) -> StockDetail:
     )
 
     if company_name is None and current_price is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Stock ticker '{normalized_ticker}' was not found",
-        )
+        raise _not_found(normalized_ticker)
 
     return StockDetail(
         ticker=normalized_ticker,
@@ -208,6 +245,9 @@ def _build_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
             or info.get("regularMarketPreviousClose")
             or _read_fast_info_value(fast_info, "previousClose")
         ),
+        "regular_price": _to_float(info.get("regularMarketPrice") or info.get("currentPrice")),
+        "pre_market_price": _to_float(info.get("preMarketPrice")),
+        "post_market_price": _to_float(info.get("postMarketPrice")),
     }
 
 
@@ -315,9 +355,36 @@ async def _from_yahoo[T](func: Callable[..., T], *args: Any) -> T:
 
 
 async def get_stock_detail(ticker: str) -> StockDetail:
-    return await _detail_cache.get_or_set(
-        normalize_ticker(ticker), lambda: _from_yahoo(_build_stock_detail, ticker)
-    )
+    normalized_ticker = normalize_ticker(ticker)
+    if _unknown_ticker_cache.get(normalized_ticker)[0]:
+        raise _not_found(normalized_ticker)
+
+    try:
+        return await _detail_cache.get_or_set(
+            normalized_ticker, lambda: _from_yahoo(_build_stock_detail, ticker)
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_404_NOT_FOUND:
+            # Yahoo takes several seconds to reject an unknown ticker, so remember the answer.
+            _unknown_ticker_cache.set(normalized_ticker, True)
+        raise
+
+
+async def ensure_ticker_exists(ticker: str) -> str:
+    """Return the normalized ticker, or raise 404 if no provider knows it.
+
+    Finnhub answers in a fraction of a second for US stocks and ETFs. Anything it does not
+    price (crypto, indices, foreign listings) is checked against Yahoo Finance instead.
+    """
+    normalized_ticker = normalize_ticker(ticker)
+    if not TICKER_PATTERN.fullmatch(normalized_ticker):
+        raise _not_found(normalized_ticker)
+
+    if _detail_cache.get(normalized_ticker)[0] or await _finnhub_price(normalized_ticker):
+        return normalized_ticker
+
+    await get_stock_detail(normalized_ticker)
+    return normalized_ticker
 
 
 async def get_stock_market_stats(ticker: str) -> dict[str, float | int | None]:
@@ -334,6 +401,55 @@ async def get_stock_history(ticker: str, range_key: str) -> StockHistoryResponse
     )
 
 
+def _repair_text(text: str) -> str:
+    """Undo mojibake such as "Appleâ\x80\x99s", where UTF-8 bytes were read as Latin-1."""
+    if "â" not in text and "Ã" not in text:
+        return text
+
+    for encoding in ("latin-1", "cp1252"):
+        try:
+            return text.encode(encoding).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+
+    return text
+
+
+def _news_items_from_finnhub(payload: Any, limit: int) -> list[StockNewsItem]:
+    if not isinstance(payload, list):
+        return []
+
+    articles: list[StockNewsItem] = []
+    seen_headlines: set[str] = set()
+    newest_first = sorted(
+        (item for item in payload if isinstance(item, dict)),
+        key=lambda item: _to_float(item.get("datetime")) or 0,
+        reverse=True,
+    )
+
+    for item in newest_first:
+        headline = _repair_text(str(item.get("headline") or "")).strip()
+        # Finnhub often lists the same story from several feeds.
+        if not headline or headline.lower() in seen_headlines:
+            continue
+
+        seen_headlines.add(headline.lower())
+        summary = _repair_text(str(item.get("summary") or "")).strip()
+        articles.append(
+            StockNewsItem(
+                headline=headline,
+                source=item.get("source") or None,
+                publish_date=_to_publish_date(item.get("datetime")),
+                summary=summary[:1000] or None,
+                url=item.get("url") or None,
+            )
+        )
+        if len(articles) >= limit:
+            break
+
+    return articles
+
+
 async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
     normalized_ticker = normalize_ticker(ticker)
     return await _news_cache.get_or_set(
@@ -342,60 +458,110 @@ async def get_stock_news(ticker: str, limit: int) -> StockNewsResponse:
 
 
 async def _load_stock_news(normalized_ticker: str, limit: int) -> StockNewsResponse:
+    if get_settings().finnhub_api_key:
+        today = datetime.now(UTC).date()
+        try:
+            payload = await _finnhub_get(
+                "/company-news",
+                {
+                    "symbol": normalized_ticker,
+                    "from": (today - timedelta(days=NEWS_LOOKBACK_DAYS)).isoformat(),
+                    "to": today.isoformat(),
+                },
+            )
+        except Exception as exc:
+            logger.warning("Finnhub news request failed for %s: %s", normalized_ticker, exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The news provider is unavailable right now. Please try again shortly.",
+            ) from exc
+
+        return StockNewsResponse(
+            ticker=normalized_ticker,
+            articles=_news_items_from_finnhub(payload, limit),
+            data_source="Finnhub",
+        )
+
     articles = await _from_yahoo(_build_stock_news_items, normalized_ticker, limit)
     return StockNewsResponse(ticker=normalized_ticker, articles=articles)
 
 
-def _build_search_result_from_quote(quote: dict[str, Any]) -> StockSearchResult | None:
-    symbol = str(quote.get("symbol") or "").strip().upper()
-    quote_type = str(quote.get("quoteType") or "").upper()
+def _display_company_name(description: str) -> str:
+    """Finnhub returns names in capitals, such as "WALT DISNEY CO/THE"."""
+    name = description.strip()
+    has_trailing_article = name.upper().endswith("/THE")
+    if has_trailing_article:
+        name = name[:-4]
+    if name.isupper():
+        name = name.title()
 
-    if not symbol or quote_type not in {"EQUITY", "ETF"}:
-        return None
-
-    return StockSearchResult(
-        ticker=symbol,
-        company_name=quote.get("longname") or quote.get("shortname") or quote.get("name"),
-        exchange=quote.get("exchange") or quote.get("exchDisp"),
-        currency=quote.get("currency"),
-        current_price=_to_float(quote.get("regularMarketPrice")),
-    )
+    return f"The {name}" if has_trailing_article else name
 
 
-def _search_stocks(query: str) -> list[StockSearchResult]:
-    normalized_query = query.strip()
-    if not normalized_query:
+def _search_results_from_finnhub(payload: Any) -> list[StockSearchResult]:
+    items = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(items, list):
         return []
 
-    try:
-        response = httpx.get(
-            YAHOO_SEARCH_URL,
-            params={"q": normalized_query, "quotesCount": 8, "newsCount": 0},
-            timeout=10,
+    results: list[StockSearchResult] = []
+    seen_symbols: set[str] = set()
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        symbol = str(item.get("symbol") or "").strip().upper()
+        if (
+            not symbol
+            or symbol in seen_symbols
+            or str(item.get("type") or "") not in FINNHUB_SEARCH_TYPES
+        ):
+            continue
+
+        seen_symbols.add(symbol)
+        results.append(
+            StockSearchResult(
+                ticker=symbol,
+                company_name=_display_company_name(str(item.get("description") or "")) or None,
+            )
         )
-        response.raise_for_status()
-        payload = response.json()
-        results = []
-        seen_symbols: set[str] = set()
+        if len(results) >= MAX_SEARCH_RESULTS:
+            break
 
-        for quote in payload.get("quotes", []):
-            if not isinstance(quote, dict):
-                continue
+    return results
 
-            result = _build_search_result_from_quote(quote)
-            if result is None or result.ticker in seen_symbols:
-                continue
 
-            seen_symbols.add(result.ticker)
-            results.append(result)
+def _search_query_variants(query: str) -> list[str]:
+    """Spellings to try in turn. Finnhub matches "coca-cola" and "jpmorgan" but not
+    "coca cola" or "jp morgan"."""
+    words = query.split()
+    variants = [query]
+    if len(words) > 1:
+        variants += ["-".join(words), "".join(words), words[0]]
 
+    return list(dict.fromkeys(variants))
+
+
+async def _search_finnhub(query: str) -> list[StockSearchResult]:
+    results: list[StockSearchResult] = []
+    for variant in _search_query_variants(query):
+        payload = await _finnhub_get("/search", {"q": variant, "exchange": "US"})
+        results = _search_results_from_finnhub(payload)
         if results:
-            return results
-    except Exception:
-        pass
+            break
 
-    alias_symbol = COMPANY_SYMBOL_ALIASES.get(normalized_query.lower())
-    detail = _build_stock_detail(alias_symbol or normalized_query)
+    prices = await asyncio.gather(*(_finnhub_price(result.ticker) for result in results))
+
+    return [
+        result.model_copy(update={"current_price": price, "currency": "USD"})
+        for result, price in zip(results, prices, strict=True)
+    ]
+
+
+def _search_exact_ticker(query: str) -> list[StockSearchResult]:
+    """Fallback without Finnhub: treat the query as a ticker or a well-known company name."""
+    alias_symbol = COMPANY_SYMBOL_ALIASES.get(query.lower())
+    detail = _build_stock_detail(alias_symbol or query)
     return [
         StockSearchResult(
             ticker=detail.ticker,
@@ -407,11 +573,26 @@ def _search_stocks(query: str) -> list[StockSearchResult]:
     ]
 
 
+async def _load_search_results(query: str) -> list[StockSearchResult]:
+    if get_settings().finnhub_api_key:
+        try:
+            return await _search_finnhub(query)
+        except Exception as exc:
+            logger.warning("Finnhub search failed for %r: %s", query, exc)
+
+    try:
+        return await _from_yahoo(_search_exact_ticker, query)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_404_NOT_FOUND:
+            return []
+        raise
+
+
 async def search_stocks(query: str) -> list[StockSearchResult]:
+    normalized_query = query.strip()
+    if not normalized_query:
+        return []
+
     return await _search_cache.get_or_set(
-        query.strip().lower(), lambda: _from_yahoo(_search_stocks, query)
+        normalized_query.lower(), lambda: _load_search_results(normalized_query)
     )
-
-
-async def search_stock_by_ticker(query: str) -> list[StockSearchResult]:
-    return await search_stocks(query)

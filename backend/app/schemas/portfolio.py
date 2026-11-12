@@ -1,6 +1,13 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _reject_future_date(value: date | None) -> date | None:
+    if value is not None and value > date.today():
+        raise ValueError("Buy date cannot be in the future")
+
+    return value
 
 
 class PortfolioHoldingCreate(BaseModel):
@@ -8,6 +15,18 @@ class PortfolioHoldingCreate(BaseModel):
     quantity: float = Field(gt=0)
     buy_price: float = Field(gt=0)
     buy_date: date
+
+    _buy_date_not_in_future = field_validator("buy_date")(_reject_future_date)
+
+
+class PortfolioHoldingUpdate(BaseModel):
+    """Fields left out keep their current value."""
+
+    quantity: float | None = Field(default=None, gt=0)
+    buy_price: float | None = Field(default=None, gt=0)
+    buy_date: date | None = None
+
+    _buy_date_not_in_future = field_validator("buy_date")(_reject_future_date)
 
 
 class PortfolioHoldingRead(BaseModel):

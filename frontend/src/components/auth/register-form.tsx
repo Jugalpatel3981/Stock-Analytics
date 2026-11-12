@@ -47,7 +47,17 @@ export function RegisterForm() {
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor="password">Password</label>
-        <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={8}
+          pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}"
+          title="At least 8 characters, with a letter and a number"
+          required
+        />
+        <p className="text-xs text-muted-foreground">At least 8 characters, with a letter and a number.</p>
       </div>
       <Button className="w-full" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Creating account..." : "Create account"}

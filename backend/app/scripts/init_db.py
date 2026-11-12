@@ -22,8 +22,12 @@ INITIAL_REVISION = "0001_initial_schema"
 
 
 async def _table_names() -> set[str]:
-    async with engine.connect() as connection:
-        return set(await connection.run_sync(lambda sync: inspect(sync).get_table_names()))
+    try:
+        async with engine.connect() as connection:
+            return set(await connection.run_sync(lambda sync: inspect(sync).get_table_names()))
+    finally:
+        # Close the pool inside this event loop; Alembic opens its own connection next.
+        await engine.dispose()
 
 
 def migrate(alembic_config: Config, existing_tables: set[str]) -> None:
@@ -35,7 +39,6 @@ def migrate(alembic_config: Config, existing_tables: set[str]) -> None:
 
 def main() -> None:
     existing_tables = asyncio.run(_table_names())
-    asyncio.run(engine.dispose())
     migrate(Config(str(ALEMBIC_INI)), existing_tables)
 
 
