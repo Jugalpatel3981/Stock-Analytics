@@ -8,6 +8,7 @@ import { SectionPanel } from "@/components/dashboard/section-panel";
 import { LiveStockCard } from "@/components/market/live-stock-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StockInsights } from "@/components/stocks/stock-insights";
 import { StockPriceChart } from "@/components/stocks/stock-price-chart";
 import { getAuthCookieHeader, requireAuthenticatedUser } from "@/lib/auth-server";
 import type { StockDetail } from "@/lib/api";
@@ -136,6 +137,8 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
         </div>
 
         <StockPriceChart ticker={stock.ticker} />
+
+        <StockInsights ticker={stock.ticker} currentPrice={stock.current_price} />
 
         <div className="grid gap-5 xl:grid-cols-[1fr_0.7fr]">
           <SectionPanel title="Company Information" description="Yahoo Finance company profile">

@@ -1,5 +1,7 @@
 import {
   BriefcaseBusiness,
+  ChartNoAxesCombined,
+  GitCompareArrows,
   LayoutDashboard,
   ListChecks,
   Newspaper,
@@ -17,12 +19,14 @@ const navigationItems = [
   { label: "Stocks", href: "/stocks", icon: TrendingUp },
   { label: "Watchlists", href: "/watchlists", icon: ListChecks },
   { label: "Portfolio", href: "/portfolio", icon: BriefcaseBusiness },
+  { label: "Analytics", href: "/analytics", icon: ChartNoAxesCombined },
+  { label: "Compare", href: "/compare", icon: GitCompareArrows },
   { label: "News", href: "/news", icon: Newspaper },
 ];
 
 type DashboardShellProps = {
   userName: string;
-  activeItem?: "Dashboard" | "Stocks" | "Watchlists" | "Portfolio" | "News";
+  activeItem?: "Dashboard" | "Stocks" | "Watchlists" | "Portfolio" | "Analytics" | "Compare" | "News";
   children: ReactNode;
 };
 

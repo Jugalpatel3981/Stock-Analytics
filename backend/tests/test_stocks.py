@@ -169,7 +169,7 @@ def _use_finnhub(monkeypatch, responses: dict[str, object]) -> list[tuple[str, d
         return response(params) if callable(response) else response
 
     monkeypatch.setattr(get_settings(), "finnhub_api_key", "test-key")
-    monkeypatch.setattr(stock_service, "_finnhub_get", fake_finnhub_get)
+    monkeypatch.setattr(stock_service, "finnhub_get", fake_finnhub_get)
     return calls
 
 

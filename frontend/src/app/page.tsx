@@ -2,9 +2,9 @@ import {
   Activity,
   BarChart3,
   Briefcase,
-  LineChart,
+  ChartNoAxesCombined,
+  GitCompareArrows,
   LayoutDashboard,
-  Newspaper,
   Search,
   ShieldCheck,
 } from "lucide-react";
@@ -23,22 +23,22 @@ const features = [
   {
     icon: Search,
     title: "Stock research",
-    description: "Look up any US stock to see its price, key statistics and company profile.",
-  },
-  {
-    icon: LineChart,
-    title: "Price charts",
-    description: "Interactive price history over one day, one week, one month or one year.",
+    description: "Search any US stock for its price history, company profile, analyst ratings, next earnings date and recent news.",
   },
   {
     icon: Briefcase,
     title: "Portfolio & watchlists",
-    description: "Track holdings with live gain/loss and growth charts, and organise symbols into watchlists.",
+    description: "Track holdings with live gain/loss, import and export them as CSV, and organise stocks into watchlists.",
   },
   {
-    icon: Newspaper,
-    title: "Market news",
-    description: "Recent headlines for the companies you follow, filtered by ticker.",
+    icon: ChartNoAxesCombined,
+    title: "Portfolio analytics",
+    description: "Compare your returns with the S&P 500 and see volatility, Sharpe ratio, beta, drawdown and sector concentration.",
+  },
+  {
+    icon: GitCompareArrows,
+    title: "Stock comparison",
+    description: "Put up to five stocks on one chart, with side-by-side risk figures and a correlation heatmap.",
   },
   {
     icon: ShieldCheck,
@@ -80,11 +80,11 @@ export default async function Home() {
         <section className="py-16 text-center sm:py-24">
           <p className="text-xs font-medium uppercase tracking-widest text-primary">Full-stack stock research platform</p>
           <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-            Live prices, stock research and portfolio tracking in one dashboard
+            Live prices, stock research and portfolio analytics in one dashboard
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-muted-foreground">
-            Search any US stock, follow it in real time, read the latest headlines, and track how your portfolio
-            and watchlists are performing.
+            Search any US stock, follow it in real time, and see how your portfolio performs against the
+            S&amp;P 500, with the risk figures to explain it.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             {user ? (

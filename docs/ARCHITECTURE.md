@@ -36,12 +36,13 @@ flowchart LR
 
 ```text
 backend/app/
+├── analytics/  # Pure risk and return calculations (volatility, Sharpe, beta, drawdown)
 ├── api/        # Routers (auth, stocks, market, watchlists, portfolio) and dependencies
 ├── core/       # Settings, database engine, password hashing and JWT
 ├── market/     # Finnhub WebSocket/REST clients, market-session rules, quote cache
 ├── models/     # SQLAlchemy tables
 ├── schemas/    # Pydantic request/response models
-└── services/   # Business logic: stocks, news, portfolio, watchlists, demo
+└── services/   # Business logic: stocks, news, portfolio, analytics, insights, watchlists, demo
 ```
 
 Routes stay thin and call services, so business logic can be tested without HTTP.
@@ -82,6 +83,26 @@ change is measured against the regular session price, not the previous day's clo
 Tickers are checked before they are saved to a watchlist or portfolio: Finnhub answers for
 US stocks and ETFs, and anything it does not price is checked against Yahoo Finance.
 Unknown tickers are remembered for ten minutes so repeat lookups fail fast.
+
+## Portfolio analytics and comparison
+
+| Step | Where | Details |
+| --- | --- | --- |
+| Prices | `stock_service.get_daily_closes` | Up to five years of daily closes per ticker from Yahoo Finance, cached for 30 minutes |
+| Maths | `analytics/metrics.py` | Pure functions on pandas series: returns, volatility, Sharpe ratio, beta, max drawdown, correlation |
+| Portfolio | `analytics_service.get_portfolio_analytics` | Aligns holdings and SPY on shared trading days, then reports risk, allocation and each holding against the benchmark |
+| Compare | `analytics_service.compare_stocks` | Rebases two to five tickers to 100 and returns their statistics and correlation matrix |
+
+Two questions are answered separately, because they need different data:
+
+- **Since purchase:** each lot is compared with putting the same money into SPY on its buy
+  date. This uses the buy price and date the user entered.
+- **Risk over the past year:** today's holdings are valued on every trading day of the last
+  year, as if held throughout, so volatility and drawdown are not distorted by deposits.
+
+Holdings without price history are left out and named in a warning, rather than failing the
+whole page. CSV import follows the same rule: good rows are saved and each bad row is
+reported with its row number.
 
 ## Testing and CI
 

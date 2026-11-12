@@ -29,6 +29,11 @@ class PortfolioHoldingUpdate(BaseModel):
     _buy_date_not_in_future = field_validator("buy_date")(_reject_future_date)
 
 
+class PortfolioHoldingImport(BaseModel):
+    # The text of a CSV file with symbol, quantity, buy_price and buy_date columns.
+    content: str = Field(min_length=1, max_length=200_000)
+
+
 class PortfolioHoldingRead(BaseModel):
     id: int
     symbol: str

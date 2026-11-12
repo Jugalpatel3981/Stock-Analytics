@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Download, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 
 import { LiveBadge } from "@/components/market/live-badge";
 import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
@@ -11,6 +11,7 @@ import { PortfolioGrowthChart } from "@/components/portfolio/portfolio-growth-ch
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
+import { importPortfolioHoldings, PORTFOLIO_EXPORT_URL, type HoldingImportResult } from "@/lib/analytics-api";
 import {
   createPortfolioHolding,
   deletePortfolioHolding,
@@ -64,6 +65,9 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
   const [editingHoldingId, setEditingHoldingId] = useState<number | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const maxBuyDate = todayIsoDate();
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<HoldingImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackedSymbols = Array.from(new Set(summary.holdings.map((holding) => holding.symbol)));
   const initialPrices = useMemo(
     () =>
@@ -123,6 +127,30 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
       showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to add holding" });
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Clear the input so choosing the same file again still triggers an import.
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      const result = await importPortfolioHoldings(await file.text());
+      setImportResult(result);
+      if (result.imported > 0) {
+        await refreshPortfolio();
+      }
+    } catch (caughtError) {
+      showToast({ message: caughtError instanceof Error ? caughtError.message : "Unable to import holdings" });
+    } finally {
+      setIsImporting(false);
     }
   }
 
@@ -216,9 +244,33 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
       ) : null}
 
       <section className="rounded-lg border bg-card/80 p-5">
-        <div className="mb-4">
-          <h2 className="text-base font-semibold">Add Holding</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Track owned positions with quantity, buy price, and buy date.</p>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Add Holding</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Track owned positions with quantity, buy price, and buy date.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              ref={fileInputRef}
+              accept=".csv,text/csv"
+              aria-label="CSV file of holdings"
+              className="hidden"
+              onChange={handleImportFile}
+              type="file"
+            />
+            <Button type="button" size="sm" variant="outline" disabled={isImporting} onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              {isImporting ? "Importing..." : "Import CSV"}
+            </Button>
+            {summary.holdings.length > 0 ? (
+              <Button size="sm" variant="outline" asChild>
+                <a href={PORTFOLIO_EXPORT_URL} download="portfolio-holdings.csv">
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Export CSV
+                </a>
+              </Button>
+            ) : null}
+          </div>
         </div>
         <form className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]" onSubmit={handleCreateHolding}>
           <Input className="uppercase" name="symbol" placeholder="Symbol" maxLength={12} required />
@@ -230,6 +282,36 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
             {isSubmitting ? "Adding..." : "Add"}
           </Button>
         </form>
+        <p className="mt-3 text-xs text-muted-foreground">
+          To add many holdings at once, import a CSV file with the columns symbol, quantity, buy_price and buy_date
+          (for example: AAPL, 10, 185.20, 2024-11-04).
+        </p>
+        {importResult ? (
+          <div className="mt-4 rounded-md border bg-background/40 p-4 text-sm" role="status">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium">
+                {importResult.imported === 1 ? "1 holding imported" : `${importResult.imported} holdings imported`}
+                {importResult.skipped > 0
+                  ? `, ${importResult.skipped} ${importResult.skipped === 1 ? "row" : "rows"} skipped`
+                  : ""}
+                .
+              </p>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setImportResult(null)} aria-label="Dismiss import result">
+                <X className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+            {importResult.errors.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                {importResult.errors.slice(0, 10).map((error) => (
+                  <li key={`${error.row}-${error.message}`}>
+                    <span className="font-medium text-foreground">Row {error.row}:</span> {error.message}
+                  </li>
+                ))}
+                {importResult.errors.length > 10 ? <li>and {importResult.errors.length - 10} more.</li> : null}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-lg border bg-card/80">

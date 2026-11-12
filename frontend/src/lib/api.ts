@@ -136,7 +136,7 @@ export type PortfolioGrowthResponse = {
   points: PortfolioGrowthPoint[];
 };
 
-async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...options,
     credentials: "include",

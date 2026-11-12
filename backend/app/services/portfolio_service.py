@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.portfolio import PortfolioHolding
+from app.schemas.analytics import HoldingImportError, HoldingImportResult
 from app.schemas.portfolio import (
     PortfolioGrowthPoint,
     PortfolioGrowthResponse,
@@ -15,7 +16,7 @@ from app.schemas.portfolio import (
     PortfolioHoldingUpdate,
     PortfolioSummary,
 )
-from app.services import market_stream_service, stock_service
+from app.services import market_stream_service, portfolio_csv, stock_service
 
 
 def build_holding_read(
@@ -117,6 +118,59 @@ async def create_holding(
 
     current_price = await get_current_price(holding.symbol)
     return build_holding_read(holding, current_price)
+
+
+async def export_holdings_csv(session: AsyncSession, user_id: int) -> str:
+    summary = await get_portfolio_summary(session, user_id)
+    return portfolio_csv.export_holdings_csv(summary.holdings)
+
+
+async def import_holdings_csv(
+    session: AsyncSession, user_id: int, content: str
+) -> HoldingImportResult:
+    """Add the holdings in a CSV file. Rows with problems are reported and skipped."""
+    parsed = portfolio_csv.parse_holdings_csv(content)
+    errors: list[HoldingImportError] = list(parsed.errors)
+
+    # Check each distinct symbol once, all at the same time.
+    symbols = sorted({holding.symbol for _row, holding in parsed.holdings})
+    checks = await asyncio.gather(
+        *(stock_service.ensure_ticker_exists(symbol) for symbol in symbols),
+        return_exceptions=True,
+    )
+    known_symbols = {
+        symbol: check
+        for symbol, check in zip(symbols, checks, strict=True)
+        if isinstance(check, str)
+    }
+
+    imported = 0
+    for row_number, holding in parsed.holdings:
+        symbol = known_symbols.get(holding.symbol)
+        if symbol is None:
+            errors.append(
+                HoldingImportError(
+                    row=row_number, message=f"Stock ticker '{holding.symbol}' was not found"
+                )
+            )
+            continue
+
+        session.add(
+            PortfolioHolding(
+                user_id=user_id,
+                symbol=symbol,
+                quantity=holding.quantity,
+                buy_price=holding.buy_price,
+                buy_date=holding.buy_date,
+            )
+        )
+        imported += 1
+
+    if imported:
+        await session.commit()
+
+    errors.sort(key=lambda error: error.row)
+    return HoldingImportResult(imported=imported, skipped=len(errors), errors=errors)
 
 
 async def _get_owned_holding(

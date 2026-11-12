@@ -2,7 +2,7 @@
 
 # Stock Intelligence Platform
 
-**Live prices, stock research and portfolio tracking in one dashboard.**
+**Live prices, stock research and portfolio analytics in one dashboard.**
 
 [![CI](https://github.com/Jugalpatel3981/ai-stock-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Jugalpatel3981/ai-stock-intelligence-platform/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -18,9 +18,9 @@
 
 ## Overview
 
-A full-stack web app for researching US stocks. Search a ticker, follow it with real-time
-prices, view its price history and company profile, read recent headlines, organise
-watchlists and track a portfolio.
+A full-stack web app for researching US stocks and analysing a portfolio. Search a company,
+follow it with real-time prices, compare stocks side by side, and see how your portfolio
+performs against the S&P 500 with the risk figures to explain it.
 
 > For informational and educational purposes only. Not financial advice.
 
@@ -29,9 +29,11 @@ watchlists and track a portfolio.
 | | Feature | How it works |
 | --- | --- | --- |
 | 📈 | **Real-time prices** | The backend proxies Finnhub's WebSocket to the browser and labels pre-market, regular and after-hours sessions. |
-| 💼 | **Portfolio and watchlists** | Live gain/loss, a portfolio growth chart, and multiple watchlists. |
+| 📊 | **Portfolio analytics** | Return against the S&P 500, volatility, Sharpe ratio, beta, max drawdown, allocation by stock and sector, and concentration warnings. |
+| ⚖️ | **Stock comparison** | Up to five stocks on one indexed chart, with side-by-side risk figures and a correlation heatmap. |
+| 💼 | **Portfolio and watchlists** | Live gain/loss, a growth chart, CSV import and export, and multiple watchlists. |
 | 🔐 | **Secure accounts** | bcrypt passwords and JWT sessions in HttpOnly cookies, plus a one-click demo account. |
-| 🔎 | **Stock research** | Company profile, key statistics and price history over one day to one year. |
+| 🔎 | **Stock research** | Search by company name, price history, company profile, analyst ratings, 52-week range and the next earnings date. |
 | 📰 | **News** | Recent headlines filtered by ticker. |
 | ⚙️ | **Production engineering** | Alembic migrations, caching, rate limiting, Docker and CI. |
 
@@ -55,9 +57,26 @@ data flow.
 | --- | --- |
 | Frontend | Next.js 15 (App Router), React, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
 | Backend | FastAPI, Python 3.12, SQLAlchemy 2 (async), Pydantic, WebSockets |
-| Data | PostgreSQL, yfinance |
+| Data and analysis | PostgreSQL, pandas, NumPy, yfinance |
 | Market data | Finnhub WebSocket and REST, Yahoo Finance |
 | DevOps | Docker, Docker Compose, Alembic, GitHub Actions, Render, Vercel, Neon |
+
+## How the analytics are calculated
+
+All figures use daily closing prices and are price returns, without dividends.
+
+| Measure | Calculation |
+| --- | --- |
+| Return against the S&P 500 | Each purchase is compared with putting the same money into SPY on the same date. |
+| Volatility | Standard deviation of daily returns, multiplied by √252 to give a yearly figure. |
+| Sharpe ratio | (Average daily return × 252 − a 4% risk-free rate) ÷ volatility. |
+| Beta | Covariance of portfolio and SPY daily returns ÷ variance of SPY daily returns. |
+| Max drawdown | The largest fall from a running peak to a later low. |
+| Correlation | Pearson correlation of daily returns between each pair of stocks. |
+
+Risk figures describe today's holdings as if they had been held for the past year. The
+calculations are pure functions in `backend/app/analytics/metrics.py`, with tests that use
+hand-checked numbers.
 
 ## Getting started
 
@@ -137,6 +156,7 @@ CI runs all of these, plus a production frontend build and Docker image builds, 
 .
 ├── backend/
 │   ├── app/
+│   │   ├── analytics/    # Risk and return calculations
 │   │   ├── api/          # FastAPI routers and dependencies
 │   │   ├── core/         # Settings, database, security
 │   │   ├── market/       # Finnhub streaming, market sessions, quote cache
@@ -159,11 +179,14 @@ Interactive docs are available at `/docs` when the backend is running.
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/demo`, `GET /auth/me` |
-| Stocks | `GET /stocks/search`, `GET /stocks/{ticker}`, `GET /stocks/{ticker}/history` |
+| Stocks | `GET /stocks/search`, `GET /stocks/{ticker}`, `GET /stocks/{ticker}/history`, `GET /stocks/{ticker}/insights` |
+| Compare | `GET /stocks/compare?symbols=AAPL,MSFT&range=1y` |
 | News | `GET /stocks/news?ticker=NVDA` |
 | Market | `GET /market/quotes?symbols=NVDA,AAPL`, `WS /market/stream?symbols=NVDA,AAPL` |
 | Watchlists | `GET /watchlists`, `POST /watchlists`, `PATCH /watchlists/{id}`, `DELETE /watchlists/{id}`, `POST /watchlists/{id}/stocks` |
 | Portfolio | `GET /portfolio/holdings`, `POST /portfolio/holdings`, `PATCH /portfolio/holdings/{id}`, `GET /portfolio/growth` |
+| Analytics | `GET /portfolio/analytics` |
+| CSV | `GET /portfolio/holdings/export`, `POST /portfolio/holdings/import` |
 
 All paths are prefixed with `/api/v1`.
 

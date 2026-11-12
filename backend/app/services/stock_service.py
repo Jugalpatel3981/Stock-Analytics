@@ -58,7 +58,10 @@ _history_cache = TTLCache(ttl_seconds=15 * 60)
 _news_cache = TTLCache(ttl_seconds=10 * 60)
 _search_cache = TTLCache(ttl_seconds=60 * 60)
 _unknown_ticker_cache = TTLCache(ttl_seconds=10 * 60)
+_daily_closes_cache = TTLCache(ttl_seconds=30 * 60)
 INTRADAY_HISTORY_TTL_SECONDS = 60
+# Periods of daily closing prices that analytics can ask for.
+DAILY_CLOSE_PERIODS = ("6mo", "1y", "5y")
 
 HISTORY_RANGES = {
     "1d": {"period": "1d", "interval": "5m"},
@@ -72,7 +75,7 @@ def normalize_ticker(ticker: str) -> str:
     return ticker.strip().upper()
 
 
-async def _finnhub_get(path: str, params: dict[str, Any]) -> Any:
+async def finnhub_get(path: str, params: dict[str, Any]) -> Any:
     """Call the Finnhub REST API. Raises if no API key is configured or the call fails."""
     api_key = get_settings().finnhub_api_key
     if not api_key:
@@ -88,7 +91,7 @@ async def _finnhub_get(path: str, params: dict[str, Any]) -> Any:
 
 async def _finnhub_price(symbol: str) -> float | None:
     try:
-        payload = await _finnhub_get("/quote", {"symbol": symbol})
+        payload = await finnhub_get("/quote", {"symbol": symbol})
     except Exception:
         return None
 
@@ -302,6 +305,27 @@ def _build_stock_history(ticker: str, range_key: str) -> StockHistoryResponse:
     )
 
 
+def _build_daily_closes(ticker: str, period: str) -> dict[str, float]:
+    """Closing price per trading day, keyed by ISO date. Split-adjusted, without dividends."""
+    history = yf.Ticker(normalize_ticker(ticker)).history(
+        period=period, interval="1d", auto_adjust=False
+    )
+    if history.empty:
+        raise _not_found(normalize_ticker(ticker))
+
+    closes: dict[str, float] = {}
+    for timestamp, close in history["Close"].items():
+        price = _to_float(close)
+        # Skip missing days (NaN is the only value that is not equal to itself).
+        if price is not None and price == price and price > 0:
+            closes[timestamp.date().isoformat()] = price
+
+    if not closes:
+        raise _not_found(normalize_ticker(ticker))
+
+    return closes
+
+
 def _build_stock_news_items(ticker: str, limit: int) -> list[StockNewsItem]:
     normalized_ticker = normalize_ticker(ticker)
     stock = yf.Ticker(normalized_ticker)
@@ -415,6 +439,16 @@ def _repair_text(text: str) -> str:
     return text
 
 
+async def get_daily_closes(ticker: str, period: str = "1y") -> dict[str, float]:
+    if period not in DAILY_CLOSE_PERIODS:
+        raise ValueError(f"Unsupported period: {period}")
+
+    return await _daily_closes_cache.get_or_set(
+        (normalize_ticker(ticker), period),
+        lambda: _from_yahoo(_build_daily_closes, ticker, period),
+    )
+
+
 def _news_items_from_finnhub(payload: Any, limit: int) -> list[StockNewsItem]:
     if not isinstance(payload, list):
         return []
@@ -461,7 +495,7 @@ async def _load_stock_news(normalized_ticker: str, limit: int) -> StockNewsRespo
     if get_settings().finnhub_api_key:
         today = datetime.now(UTC).date()
         try:
-            payload = await _finnhub_get(
+            payload = await finnhub_get(
                 "/company-news",
                 {
                     "symbol": normalized_ticker,
@@ -545,7 +579,7 @@ def _search_query_variants(query: str) -> list[str]:
 async def _search_finnhub(query: str) -> list[StockSearchResult]:
     results: list[StockSearchResult] = []
     for variant in _search_query_variants(query):
-        payload = await _finnhub_get("/search", {"q": variant, "exchange": "US"})
+        payload = await finnhub_get("/search", {"q": variant, "exchange": "US"})
         results = _search_results_from_finnhub(payload)
         if results:
             break

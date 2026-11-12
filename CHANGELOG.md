@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Analytics page:** portfolio return against the S&P 500, volatility, Sharpe ratio, beta,
+  max drawdown, allocation by stock and sector, and concentration warnings.
+- **Compare page:** up to five stocks on one indexed chart, with side-by-side risk figures and
+  a correlation heatmap.
+- Analyst ratings, 52-week range, next earnings date and key figures on each stock page.
+- CSV import and export for portfolio holdings, with a row-by-row report of anything skipped.
 - Rename and delete watchlists, and edit a holding's quantity, buy price and buy date.
 - A "no stocks found" message for searches without results.
 
