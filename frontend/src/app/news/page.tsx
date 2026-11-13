@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { SectionPanel } from "@/components/dashboard/section-panel";
 import { StockNewsFeed } from "@/components/news/stock-news-feed";
-import { Badge } from "@/components/ui/badge";
 import { requireAuthenticatedUser } from "@/lib/auth-server";
 
 export const metadata: Metadata = { title: "News" };
@@ -22,19 +22,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   return (
     <DashboardShell userName={user.name} activeItem="News">
       <div className="space-y-5">
-        <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Market headlines</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal">News</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Filter financial headlines by ticker to understand recent company-specific context.
-          </p>
-        </div>
+        <PageHeader title="News" description="Recent headlines for any stock." />
 
-        <SectionPanel
-          title="Stock News"
-          description="Headlines from the past week, filtered by ticker"
-          action={<Badge variant="secondary">Informational</Badge>}
-        >
+        <SectionPanel title="Headlines" description="From the past week, newest first.">
           <StockNewsFeed initialTicker={initialTicker} />
         </SectionPanel>
       </div>

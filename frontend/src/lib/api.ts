@@ -136,21 +136,42 @@ export type PortfolioGrowthResponse = {
   points: PortfolioGrowthPoint[];
 };
 
+const SERVER_UNREACHABLE_MESSAGE =
+  "The server is not responding. It may still be starting up, so please wait a moment and try again.";
+
+function describeError(status: number, detail: unknown) {
+  if (typeof detail === "string" && detail) {
+    return detail;
+  }
+
+  // Validation errors arrive as a list; show the first one in plain words.
+  if (Array.isArray(detail) && typeof detail[0]?.msg === "string") {
+    return detail[0].msg.replace(/^Value error, /, "");
+  }
+
+  // No readable answer from the API usually means it has not finished starting.
+  return status >= 500 ? SERVER_UNREACHABLE_MESSAGE : "Request failed";
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...options,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new Error(SERVER_UNREACHABLE_MESSAGE);
+  }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
-    const message = payload?.detail ?? "Request failed";
-    throw new Error(message);
+    throw new Error(describeError(response.status, payload?.detail));
   }
 
   if (response.status === 204) {

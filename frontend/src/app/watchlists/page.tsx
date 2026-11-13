@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { WatchlistManager } from "@/components/watchlists/watchlist-manager";
 import { getAuthCookieHeader, requireAuthenticatedUser } from "@/lib/auth-server";
 import type { Watchlist } from "@/lib/api";
@@ -30,13 +31,7 @@ export default async function WatchlistsPage() {
   return (
     <DashboardShell userName={user.name} activeItem="Watchlists">
       <div className="space-y-5">
-        <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Personal research lists</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal">Watchlists</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Create focused lists of tickers, add stocks, and jump into detailed research pages.
-          </p>
-        </div>
+        <PageHeader title="Watchlists" description="Group the stocks you want to follow and see their live prices." />
         <WatchlistManager initialWatchlists={watchlists} />
       </div>
     </DashboardShell>

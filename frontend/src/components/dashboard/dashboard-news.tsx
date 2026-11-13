@@ -1,13 +1,15 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { RowsSkeleton } from "@/components/ui/skeleton";
 import { getStockNews, getWatchlists, type StockNewsItem } from "@/lib/api";
 
 const FALLBACK_TICKER = "NVDA";
-const ARTICLE_LIMIT = 4;
+const ARTICLE_LIMIT = 5;
 
 function formatPublishDate(value: string | null) {
   if (!value) {
@@ -59,43 +61,48 @@ export function DashboardNews() {
     };
   }, []);
 
-  if (error) {
-    return <p className="rounded-md border bg-background/40 p-4 text-sm text-muted-foreground">{error}</p>;
-  }
-
-  if (articles === null) {
-    return <p className="rounded-md border bg-background/40 p-4 text-sm text-muted-foreground">Loading latest news...</p>;
-  }
-
-  if (articles.length === 0) {
-    return <p className="rounded-md border bg-background/40 p-4 text-sm text-muted-foreground">No recent news for {ticker}.</p>;
-  }
-
   return (
-    <div className="space-y-3">
-      {articles.map((article) => (
-        <article key={article.url ?? article.headline} className="rounded-md border bg-background/40 p-4">
-          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span>
-              {ticker} · {article.source ?? "News"}
-            </span>
-            <span>{formatPublishDate(article.publish_date)}</span>
-          </div>
-          <h2 className="mt-2 text-sm font-medium leading-5">
-            {article.url ? (
-              <a className="hover:underline" href={article.url} rel="noreferrer" target="_blank">
-                {article.headline}
-                <ExternalLink className="ml-1 inline h-3 w-3 text-muted-foreground" aria-hidden="true" />
-              </a>
-            ) : (
-              article.headline
-            )}
-          </h2>
-        </article>
-      ))}
-      <Link className="block text-center text-xs font-medium text-primary hover:underline" href={`/news?ticker=${ticker}`}>
-        More news
-      </Link>
-    </div>
+    <section className="min-w-0 rounded-lg border bg-card/80">
+      <div className="flex items-start justify-between gap-4 border-b p-5">
+        <div>
+          <h2 className="text-base font-semibold">Latest news</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {ticker ? `Recent headlines for ${ticker}.` : "Recent headlines from your watchlist."}
+          </p>
+        </div>
+        <Button size="sm" variant="ghost" asChild>
+          <Link href={ticker ? `/news?ticker=${ticker}` : "/news"}>
+            More
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </Button>
+      </div>
+      <div className="p-5">
+        {error ? (
+          <p className="text-sm text-muted-foreground">{error}</p>
+        ) : articles === null ? (
+          <RowsSkeleton rows={5} />
+        ) : articles.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recent news for {ticker}.</p>
+        ) : (
+          <ul className="divide-y">
+            {articles.map((article) => (
+              <li key={article.url ?? article.headline} className="py-3 first:pt-0 last:pb-0">
+                {article.url ? (
+                  <a className="text-sm font-medium leading-5 hover:underline" href={article.url} rel="noreferrer" target="_blank">
+                    {article.headline}
+                  </a>
+                ) : (
+                  <p className="text-sm font-medium leading-5">{article.headline}</p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {[article.source, formatPublishDate(article.publish_date)].filter(Boolean).join(" · ")}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }

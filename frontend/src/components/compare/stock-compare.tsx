@@ -9,6 +9,7 @@ import { IndexedLineChart } from "@/components/charts/indexed-line-chart";
 import { SectionPanel } from "@/components/dashboard/section-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PanelSkeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
 import { compareStocks, type ComparisonRange, type StockComparison } from "@/lib/analytics-api";
 import { searchStocks } from "@/lib/api";
@@ -206,7 +207,10 @@ export function StockCompare({ initialSymbols }: StockCompareProps) {
       ) : error ? (
         <p className="rounded-lg border bg-card/80 p-8 text-center text-sm text-muted-foreground">{error}</p>
       ) : comparison === null ? (
-        <p className="rounded-lg border bg-card/80 p-8 text-center text-sm text-muted-foreground">Loading comparison...</p>
+        <div className="space-y-5">
+          <PanelSkeleton height="h-80" />
+          <PanelSkeleton height="h-48" />
+        </div>
       ) : (
         <div className={cn("space-y-5 transition-opacity", isLoading && "opacity-60")}>
           {comparison.missing_symbols.length > 0 ? (

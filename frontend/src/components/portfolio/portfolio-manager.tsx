@@ -23,6 +23,7 @@ import {
   type PortfolioSummary,
 } from "@/lib/api";
 import { useMarketStream } from "@/lib/market-stream";
+import { cn } from "@/lib/utils";
 
 type PortfolioManagerProps = {
   initialSummary: PortfolioSummary;
@@ -219,10 +220,18 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
   const unavailable = "Unavailable";
 
   const statCards = [
-    { label: "Current Value", value: hasPrices ? formatCurrency(liveTotalValue) : unavailable },
-    { label: "Cost Basis", value: formatCurrency(totalCost) },
-    { label: "Gain/Loss", value: hasPrices ? formatCurrency(liveTotalGainLoss) : unavailable },
-    { label: "Return", value: hasPrices ? formatPercent(liveTotalReturn) : unavailable },
+    { label: "Current Value", value: hasPrices ? formatCurrency(liveTotalValue) : unavailable, tone: null },
+    { label: "Cost Basis", value: formatCurrency(totalCost), tone: null },
+    {
+      label: "Gain / Loss",
+      value: hasPrices ? `${liveTotalGainLoss > 0 ? "+" : ""}${formatCurrency(liveTotalGainLoss)}` : unavailable,
+      tone: hasPrices ? liveTotalGainLoss : null,
+    },
+    {
+      label: "Return",
+      value: hasPrices ? `${liveTotalReturn > 0 ? "+" : ""}${formatPercent(liveTotalReturn)}` : unavailable,
+      tone: hasPrices ? liveTotalReturn : null,
+    },
   ];
 
   return (
@@ -231,7 +240,15 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
         {statCards.map((card) => (
           <div key={card.label} className="rounded-lg border bg-card/80 p-4">
             <p className="text-xs font-medium uppercase text-muted-foreground">{card.label}</p>
-            <p className="mt-3 text-2xl font-semibold tracking-normal">{card.value}</p>
+            <p
+              className={cn(
+                "mt-3 text-2xl font-semibold tracking-normal",
+                card.tone !== null && card.tone > 0 && "text-emerald-400",
+                card.tone !== null && card.tone < 0 && "text-red-400",
+              )}
+            >
+              {card.value}
+            </p>
           </div>
         ))}
       </div>
@@ -316,8 +333,8 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
 
       <section className="rounded-lg border bg-card/80">
         <div className="border-b p-5">
-          <h2 className="text-base font-semibold">Portfolio Growth</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Historical portfolio value based on closing prices and holdings.</p>
+          <h2 className="text-base font-semibold">Value over the past year</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Based on daily closing prices, counting each holding from its buy date.</p>
         </div>
         <div className="p-5">
           <PortfolioGrowthChart points={growth} />
@@ -328,7 +345,7 @@ export function PortfolioManager({ initialSummary, initialGrowth, reloadOnMount 
         <div className="border-b p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold">Holdings Table</h2>
+              <h2 className="text-base font-semibold">Holdings</h2>
               <p className="mt-1 text-sm text-muted-foreground">Live value, gain/loss, and percentage return.</p>
             </div>
             <LiveBadge

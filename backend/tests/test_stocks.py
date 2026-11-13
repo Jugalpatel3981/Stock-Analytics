@@ -404,3 +404,41 @@ async def test_slow_yahoo_calls_time_out(monkeypatch) -> None:
         await stock_service.get_stock_detail("NVDA")
 
     assert caught.value.status_code == 504
+
+
+def test_history_skips_rows_with_missing_prices(monkeypatch) -> None:
+    import pandas as pd
+
+    class FakeTicker:
+        def __init__(self, _ticker: str) -> None:
+            pass
+
+        def history(self, **_kwargs) -> pd.DataFrame:
+            return pd.DataFrame(
+                {
+                    "Open": [100.0, float("nan"), 102.0],
+                    "High": [101.0, float("nan"), 103.0],
+                    "Low": [99.0, float("nan"), 101.0],
+                    "Close": [100.5, float("nan"), 102.5],
+                    "Volume": [1000, float("nan"), 1200],
+                },
+                index=pd.to_datetime(["2026-11-10", "2026-11-11", "2026-11-12"]),
+            )
+
+    monkeypatch.setattr(stock_service.yf, "Ticker", FakeTicker)
+
+    history = stock_service._build_stock_history("AAPL", "1mo")
+    closes = stock_service._build_daily_closes("AAPL", "1y")
+
+    assert [point.close for point in history.prices] == [100.5, 102.5]
+    assert history.prices[0].volume == 1000
+    assert closes == {"2026-11-10": 100.5, "2026-11-12": 102.5}
+    # The response must be valid JSON, which rejects NaN.
+    assert "NaN" not in history.model_dump_json()
+
+
+def test_to_float_rejects_values_that_are_not_finite_numbers() -> None:
+    assert stock_service._to_float("12.5") == 12.5
+    assert stock_service._to_float(float("nan")) is None
+    assert stock_service._to_float(float("inf")) is None
+    assert stock_service._to_float("N/A") is None

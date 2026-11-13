@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { SectionPanel } from "@/components/dashboard/section-panel";
+import { RowsSkeleton } from "@/components/ui/skeleton";
 import { getStockInsights, type StockInsights as StockInsightsData } from "@/lib/analytics-api";
 import { formatCurrency, formatDate, formatNumber, formatPercent, formatSignedPercent } from "@/lib/format";
 
@@ -122,7 +123,7 @@ export function StockInsights({ ticker, currentPrice }: StockInsightsProps & { c
   if (insights === null) {
     return (
       <SectionPanel title="Analyst view and key figures" description="Ratings, earnings and yearly range">
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <RowsSkeleton rows={3} />
       </SectionPanel>
     );
   }

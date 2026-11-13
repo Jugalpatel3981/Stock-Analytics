@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { IndexedLineChart } from "@/components/charts/indexed-line-chart";
 import { SectionPanel } from "@/components/dashboard/section-panel";
 import { Button } from "@/components/ui/button";
+import { PanelSkeleton, StatTilesSkeleton } from "@/components/ui/skeleton";
 import {
   getPortfolioAnalytics,
   type AllocationSlice,
@@ -153,7 +154,13 @@ export function PortfolioAnalytics() {
   }
 
   if (analytics === null) {
-    return <p className="rounded-lg border bg-card/80 p-6 text-sm text-muted-foreground">Analysing your portfolio...</p>;
+    return (
+      <div className="space-y-5">
+        <StatTilesSkeleton />
+        <PanelSkeleton height="h-80" />
+        <PanelSkeleton height="h-64" />
+      </div>
+    );
   }
 
   if (analytics.holdings.length === 0) {

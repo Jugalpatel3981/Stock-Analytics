@@ -12,6 +12,7 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
 import { getStockHistory, type HistoricalPricePoint, type StockHistoryRange } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -111,7 +112,7 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
     <section className="rounded-lg border bg-card/80">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-base font-semibold">Historical Price Chart</h2>
+          <h2 className="text-base font-semibold">Price history</h2>
           <p className="mt-1 text-sm text-muted-foreground">Open, high, low and close for the selected period</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -146,7 +147,7 @@ export function StockPriceChart({ ticker }: StockPriceChartProps) {
 
         <div className="h-[340px] rounded-md border bg-background/30 p-3">
           {isLoading ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading chart...</div>
+            <Skeleton className="h-full w-full" />
           ) : prices.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">No historical prices available.</div>
           ) : (

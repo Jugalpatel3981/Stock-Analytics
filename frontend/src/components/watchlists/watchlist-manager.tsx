@@ -7,9 +7,9 @@ import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 import { LiveBadge } from "@/components/market/live-badge";
 import { MarketStreamErrorToast } from "@/components/market/market-stream-error-toast";
-import { LivePrice } from "@/components/market/live-price";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   addStockToWatchlist,
@@ -22,7 +22,10 @@ import {
   type StockSearchResult,
   type WatchlistStock,
 } from "@/lib/api";
+import { changeColor, formatCurrency, formatSignedPercent } from "@/lib/format";
 import { useMarketStream } from "@/lib/market-stream";
+import { summarizeQuote } from "@/lib/quote-display";
+import { cn } from "@/lib/utils";
 
 type WatchlistManagerProps = {
   initialWatchlists: Watchlist[];
@@ -220,7 +223,7 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
       ) : (
         <div className="grid gap-5 xl:grid-cols-2">
           {watchlists.map((watchlist) => (
-            <section key={watchlist.id} className="rounded-lg border bg-card/80">
+            <section key={watchlist.id} className="min-w-0 rounded-lg border bg-card/80">
               <div className="border-b p-5">
                 <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
                   <div className="min-w-[14rem] flex-1">
@@ -325,29 +328,61 @@ export function WatchlistManager({ initialWatchlists }: WatchlistManagerProps) {
 
               <div className="p-5">
                 {watchlist.stocks.length === 0 ? (
-                  <p className="rounded-md border bg-background/40 p-4 text-sm text-muted-foreground">No stocks added yet.</p>
+                  <p className="text-sm text-muted-foreground">No stocks yet. Search above to add one.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {watchlist.stocks.map((stock) => (
-                      <div key={stock.id} className="grid gap-3 rounded-md border bg-background/40 px-4 py-3 sm:grid-cols-[1fr_1.5fr_auto] sm:items-center">
-                        <div>
-                          <Link className="font-semibold text-primary hover:underline" href={`/stocks/${stock.ticker}`}>
-                            {stock.ticker}
-                          </Link>
-                        </div>
-                        <LivePrice quote={quotes[stock.ticker]} compact />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveStock(watchlist.id, stock.ticker)}
-                          disabled={activeMutation === `remove-${watchlist.id}-${stock.ticker}`}
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
+                  <div className="-mx-5 overflow-x-auto">
+                    <table className="w-full min-w-[320px] text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          <th className="px-5 pb-2 font-medium">Stock</th>
+                          <th className="px-3 pb-2 text-right font-medium">Price</th>
+                          <th className="px-3 pb-2 text-right font-medium">Today</th>
+                          <th className="px-5 pb-2" aria-label="Remove" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {watchlist.stocks.map((stock) => {
+                          const summary = summarizeQuote(quotes[stock.ticker]);
+
+                          return (
+                            <tr key={stock.id} className="border-b last:border-b-0">
+                              <td className="px-5 py-3">
+                                <Link className="font-semibold text-primary hover:underline" href={`/stocks/${stock.ticker}`}>
+                                  {stock.ticker}
+                                </Link>
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                {summary.price === null ? <Skeleton className="ml-auto h-4 w-16" /> : formatCurrency(summary.price)}
+                                {summary.extended ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {summary.extended.label}{" "}
+                                    <span className={cn("font-medium", changeColor(summary.extended.change))}>
+                                      {formatSignedPercent(summary.extended.change, 2)}
+                                    </span>
+                                  </p>
+                                ) : null}
+                              </td>
+                              <td className={cn("px-3 py-3 text-right font-medium", changeColor(summary.dayChange))}>
+                                {formatSignedPercent(summary.dayChange, 2)}
+                              </td>
+                              <td className="px-5 py-3 text-right">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveStock(watchlist.id, stock.ticker)}
+                                  disabled={activeMutation === `remove-${watchlist.id}-${stock.ticker}`}
+                                  aria-label={`Remove ${stock.ticker} from ${watchlist.name}`}
+                                  title="Remove from watchlist"
+                                >
+                                  <X className="h-4 w-4" aria-hidden="true" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
                 <MarketStreamErrorToast error={streamError} />

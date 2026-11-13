@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -116,13 +117,16 @@ def _read_fast_info_value(fast_info: Any, key: str) -> Any:
 
 
 def _to_float(value: Any) -> float | None:
+    """A finite number, or None. Yahoo marks missing prices as NaN, which JSON cannot carry."""
     if value in (None, "", "N/A"):
         return None
 
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+
+    return number if math.isfinite(number) else None
 
 
 def _to_int(value: Any) -> int | None:
@@ -316,8 +320,7 @@ def _build_daily_closes(ticker: str, period: str) -> dict[str, float]:
     closes: dict[str, float] = {}
     for timestamp, close in history["Close"].items():
         price = _to_float(close)
-        # Skip missing days (NaN is the only value that is not equal to itself).
-        if price is not None and price == price and price > 0:
+        if price is not None and price > 0:
             closes[timestamp.date().isoformat()] = price
 
     if not closes:

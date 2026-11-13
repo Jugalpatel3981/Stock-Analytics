@@ -52,7 +52,7 @@ function sessionPriceLabel(quote: LiveQuote | undefined, currency: string | null
       return "Waiting for after-hours trade";
     }
 
-    return `After Hours Price ${formatCurrency(quote.extendedHoursPrice ?? quote.price, currency)}`;
+    return `After hours ${formatCurrency(quote.extendedHoursPrice ?? quote.price, currency)}`;
   }
 
   if (quote.marketSession === "CLOSED") {
@@ -72,8 +72,7 @@ function referencePriceLabel(quote: LiveQuote | undefined, currency: string | nu
   }
 
   if (quote.marketSession === "AFTER_HOURS") {
-    const source = quote.extendedHoursSource ? ` - ${quote.extendedHoursSource}` : "";
-    return `Regular close ${formatCurrency(quote.regularPrice ?? quote.previousClose, currency)}${source}`;
+    return `Regular close ${formatCurrency(quote.regularPrice ?? quote.previousClose, currency)}`;
   }
 
   if (quote.marketSession === "CLOSED" && quote.nextMarketOpen) {

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Building2, ExternalLink, GitCompareArrows, Newspaper } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { SectionPanel } from "@/components/dashboard/section-panel";
 import { LiveStockCard } from "@/components/market/live-stock-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StockInsights } from "@/components/stocks/stock-insights";
 import { StockPriceChart } from "@/components/stocks/stock-price-chart";
@@ -82,23 +81,36 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
   const stock = await getStockDetail(ticker);
 
   const fundamentals = [
-    { label: "Current Price", value: formatCurrency(stock.current_price, stock.currency) },
+    { label: "Last Price", value: formatCurrency(stock.current_price, stock.currency) },
     { label: "Volume", value: formatNumber(stock.volume) },
     { label: "Market Cap", value: formatLargeNumber(stock.market_cap) },
-    { label: "PE Ratio", value: stock.pe_ratio ? stock.pe_ratio.toFixed(2) : "N/A" },
+    { label: "P/E Ratio", value: stock.pe_ratio ? stock.pe_ratio.toFixed(2) : "N/A" },
   ];
 
   return (
     <DashboardShell userName={user.name} activeItem="Stocks">
       <div className="space-y-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Button variant="outline" size="sm" asChild>
             <Link href="/stocks">
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Back to Stocks
             </Link>
           </Button>
-          <Badge variant="secondary">{stock.data_source}</Badge>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/news?ticker=${encodeURIComponent(stock.ticker)}`}>
+                <Newspaper className="h-4 w-4" aria-hidden="true" />
+                News
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/compare?symbols=${encodeURIComponent(stock.ticker)},SPY`}>
+                <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
+                Compare with S&amp;P 500
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <section className="rounded-lg border bg-card/80 p-5">
@@ -141,13 +153,13 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
         <StockInsights ticker={stock.ticker} currentPrice={stock.current_price} />
 
         <div className="grid gap-5 xl:grid-cols-[1fr_0.7fr]">
-          <SectionPanel title="Company Information" description="Yahoo Finance company profile">
+          <SectionPanel title="About the company" description="Business summary">
             <p className="text-sm leading-6 text-muted-foreground">
               {stock.business_summary ?? "Business summary is unavailable for this ticker."}
             </p>
           </SectionPanel>
 
-          <SectionPanel title="Classification" description="Sector and industry metadata">
+          <SectionPanel title="Classification" description="Sector and industry">
             <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-3 border-b pb-3">
                 <span className="text-muted-foreground">Sector</span>

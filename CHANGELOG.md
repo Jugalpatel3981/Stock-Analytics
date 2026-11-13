@@ -17,6 +17,14 @@ All notable changes to this project are documented here. The format follows
 - A "no stocks found" message for searches without results.
 
 ### Changed
+- **Redesigned dashboard:** four key figures, a portfolio vs S&P 500 chart, top movers, and a
+  watchlist table with one-month trend lines. It replaces the editable market cards and the
+  duplicate watchlist.
+- Each page shows its title once, in a consistent header. Gains and losses are green and red
+  everywhere, with the day's change kept separate from pre-market and after-hours moves.
+- Phones get a slide-in menu instead of a horizontal tab strip, and no page scrolls sideways.
+- Pages show grey placeholders while data loads instead of "Loading..." text.
+- If the server is not ready, pages show "Waiting for the server" and retry by themselves.
 - Stock search and company news now use Finnhub. Search finds companies by name
   (for example "disney" or "coca cola") instead of only exact tickers.
 - The open, high, low and close boxes above the price chart describe the whole selected
@@ -32,6 +40,8 @@ All notable changes to this project are documented here. The format follows
 - Passwords made only of digits or only of letters were accepted.
 - The frontend container always reported "unhealthy".
 - The backend logged an "Event loop is closed" error on every start.
+- Price history failed with a server error when Yahoo Finance returned a day with missing
+  prices. Such days are now skipped.
 
 ### Removed
 - The AI assistant, news sentiment and price prediction features, with their database

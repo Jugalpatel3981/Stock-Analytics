@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RowsSkeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
 import { getStockNews, type StockNewsItem } from "@/lib/api";
 
@@ -91,8 +92,8 @@ export function StockNewsFeed({ initialTicker }: StockNewsFeedProps) {
       </div>
 
       {isLoading ? (
-        <div className="rounded-md border bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
-          Loading financial headlines...
+        <div className="rounded-md border bg-background/40 p-4">
+          <RowsSkeleton rows={5} />
         </div>
       ) : articles.length === 0 ? (
         <div className="rounded-md border bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
