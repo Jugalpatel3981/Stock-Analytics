@@ -10,7 +10,6 @@ COMPOSE_PROJECT_NAME=ai-stock-intelligence-platform
 POSTGRES_DB=stock_intelligence
 POSTGRES_USER=stock_user
 POSTGRES_PASSWORD=stock_password
-POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 BACKEND_PORT=8000
 FRONTEND_PORT=3000

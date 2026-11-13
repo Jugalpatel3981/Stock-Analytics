@@ -71,7 +71,8 @@ Fast and slow data come from different sources so neither overwrites the other:
 | Data | Source | Refresh |
 | --- | --- | --- |
 | Last price, change | Finnhub WebSocket, proxied by the backend | Every trade |
-| Open, high, low, volume, previous close | Finnhub REST, with Yahoo fallback | 30-second cache |
+| Open, high, low, previous close | Finnhub REST | 30-second cache |
+| Volume | Yahoo Finance | 30-second cache |
 | Company profile, price history | Yahoo Finance via `yfinance` | Cached 1 to 15 minutes |
 | Stock search, company news | Finnhub REST | Cached 10 to 60 minutes |
 | Pre-market and after-hours price | Yahoo Finance, when Finnhub has no extended-hours trade | 30-second cache |

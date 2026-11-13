@@ -136,7 +136,7 @@ npm run dev:frontend
 
 ```bash
 # From the backend directory
-pytest          # 127 tests
+pytest          # 125 tests
 ruff check .    # lint
 
 # From the repository root

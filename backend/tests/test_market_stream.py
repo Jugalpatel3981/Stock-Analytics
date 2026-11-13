@@ -4,17 +4,13 @@ from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token, create_stream_token
 from app.main import app
+from app.market.market_session import get_market_session, session_prices
 from app.market.rest_market_service import (
-    _stats_from_candle_payload,
+    enrich_with_yahoo_extended_hours,
     enrich_with_yahoo_market_stats,
 )
 from app.schemas.market import MarketQuote
-from app.services.market_stream_service import (
-    _enrich_with_yahoo_extended_hours,
-    _session_prices,
-    get_market_session,
-    normalize_symbols,
-)
+from app.services.market_stream_service import normalize_symbols
 
 client = TestClient(app)
 
@@ -102,88 +98,15 @@ def test_market_session_detects_weekend_closed() -> None:
 
 
 def test_after_hours_without_extended_activity_uses_current_price_as_regular_close() -> None:
-    regular_price, extended_hours_price = _session_prices(
+    regular_price, extended_hours_price = session_prices(
         market_session="AFTER_HOURS",
         current_price=234.11,
         previous_close=232.79,
-        has_extended_hours_activity=False,
+        has_extended_activity=False,
     )
 
     assert regular_price == 234.11
     assert extended_hours_price is None
-
-
-def test_yahoo_extended_hours_fallback_enriches_after_hours_quote() -> None:
-    quote = MarketQuote(
-        symbol="MSFT",
-        current_price=390.34,
-        previous_close=388.00,
-        regular_price=390.34,
-        market_session="AFTER_HOURS",
-        next_market_open="2026-06-15T09:30:00-04:00",
-        timestamp="2026-06-12T20:00:00+00:00",
-    )
-
-    enriched_quote = _enrich_with_yahoo_extended_hours(
-        quote,
-        {
-            "symbol": "MSFT",
-            "regularMarketPrice": 390.34,
-            "postMarketPrice": 391.1,
-            "postMarketChange": 0.76,
-            "postMarketChangePercent": 0.1947,
-            "postMarketTime": 1781299800,
-        },
-    )
-
-    assert enriched_quote.current_price == 391.1
-    assert enriched_quote.extended_hours_price == 391.1
-    assert enriched_quote.regular_price == 390.34
-    assert enriched_quote.has_extended_hours_activity is True
-    assert enriched_quote.extended_hours_status == "ACTIVE"
-    assert enriched_quote.extended_hours_source == "Yahoo Finance"
-    assert enriched_quote.source == "Finnhub + Yahoo Finance"
-
-
-def test_yahoo_extended_hours_fallback_keeps_waiting_quote_without_extended_price() -> None:
-    quote = MarketQuote(
-        symbol="AMZN",
-        current_price=241.51,
-        regular_price=241.51,
-        market_session="AFTER_HOURS",
-        next_market_open="2026-06-15T09:30:00-04:00",
-        timestamp="2026-06-12T20:00:00+00:00",
-    )
-
-    enriched_quote = _enrich_with_yahoo_extended_hours(
-        quote,
-        {
-            "symbol": "AMZN",
-            "regularMarketPrice": 241.51,
-        },
-    )
-
-    assert enriched_quote.current_price == 241.51
-    assert enriched_quote.extended_hours_price is None
-    assert enriched_quote.has_extended_hours_activity is False
-    assert enriched_quote.extended_hours_status == "WAITING"
-
-
-def test_market_stats_sums_intraday_volume_and_ohlc() -> None:
-    stats = _stats_from_candle_payload(
-        {
-            "s": "ok",
-            "o": [100.0, 101.0, 102.0],
-            "h": [103.0, 104.5, 103.5],
-            "l": [99.0, 100.5, 101.5],
-            "v": [1000, 2500, 3000],
-        }
-    )
-
-    assert stats["open"] == 100.0
-    assert stats["high"] == 104.5
-    assert stats["low"] == 99.0
-    assert stats["volume"] == 6500
 
 
 def test_yahoo_market_stats_fallback_fills_volume_and_day_stats() -> None:
@@ -199,12 +122,11 @@ def test_yahoo_market_stats_fallback_fills_volume_and_day_stats() -> None:
     enriched_quote = enrich_with_yahoo_market_stats(
         quote,
         {
-            "symbol": "NVDA",
-            "regularMarketVolume": 52300000,
-            "regularMarketOpen": 198.12,
-            "regularMarketDayHigh": 199.45,
-            "regularMarketDayLow": 192.8,
-            "regularMarketPreviousClose": 197.58,
+            "volume": 52300000,
+            "open": 198.12,
+            "high": 199.45,
+            "low": 192.8,
+            "previous_close": 197.58,
         },
     )
 
@@ -216,9 +138,7 @@ def test_yahoo_market_stats_fallback_fills_volume_and_day_stats() -> None:
     assert enriched_quote.source == "Finnhub + Yahoo Finance"
 
 
-def test_yfinance_extended_hours_measures_change_against_the_regular_close() -> None:
-    from app.market.rest_market_service import enrich_with_yfinance_extended_hours
-
+def test_extended_hours_measures_change_against_the_regular_close() -> None:
     quote = MarketQuote(
         symbol="MSFT",
         current_price=521.13,
@@ -231,7 +151,7 @@ def test_yfinance_extended_hours_measures_change_against_the_regular_close() -> 
         timestamp="2026-11-11T21:00:00+00:00",
     )
 
-    enriched = enrich_with_yfinance_extended_hours(
+    enriched = enrich_with_yahoo_extended_hours(
         quote, {"regular_price": 521.13, "post_market_price": 522.05, "previous_close": 533.16}
     )
 
@@ -245,9 +165,7 @@ def test_yfinance_extended_hours_measures_change_against_the_regular_close() -> 
     assert round(enriched.change_percent, 2) == 0.18
 
 
-def test_yfinance_extended_hours_leaves_quote_alone_without_an_extended_price() -> None:
-    from app.market.rest_market_service import enrich_with_yfinance_extended_hours
-
+def test_extended_hours_leaves_quote_alone_without_an_extended_price() -> None:
     quote = MarketQuote(
         symbol="AMZN",
         current_price=266.17,
@@ -257,13 +175,11 @@ def test_yfinance_extended_hours_leaves_quote_alone_without_an_extended_price() 
         timestamp="2026-11-11T21:00:00+00:00",
     )
 
-    assert enrich_with_yfinance_extended_hours(quote, {"post_market_price": None}) == quote
-    assert enrich_with_yfinance_extended_hours(quote, None) == quote
+    assert enrich_with_yahoo_extended_hours(quote, {"post_market_price": None}) == quote
+    assert enrich_with_yahoo_extended_hours(quote, None) == quote
 
 
-def test_yfinance_extended_hours_is_ignored_during_regular_trading() -> None:
-    from app.market.rest_market_service import enrich_with_yfinance_extended_hours
-
+def test_extended_hours_is_ignored_during_regular_trading() -> None:
     quote = MarketQuote(
         symbol="AMZN",
         current_price=266.17,
@@ -271,4 +187,25 @@ def test_yfinance_extended_hours_is_ignored_during_regular_trading() -> None:
         timestamp="2026-11-11T16:00:00+00:00",
     )
 
-    assert enrich_with_yfinance_extended_hours(quote, {"post_market_price": 270.0}) == quote
+    assert enrich_with_yahoo_extended_hours(quote, {"post_market_price": 270.0}) == quote
+
+
+def test_market_stats_keep_figures_the_finnhub_quote_already_has() -> None:
+    quote = MarketQuote(
+        symbol="NVDA",
+        current_price=193.26,
+        open=198.0,
+        high=199.0,
+        low=192.0,
+        previous_close=197.0,
+        market_session="OPEN",
+        timestamp="2026-07-02T19:00:00+00:00",
+    )
+
+    enriched_quote = enrich_with_yahoo_market_stats(
+        quote, {"volume": 1000, "open": 1.0, "high": 2.0, "low": 0.5, "previous_close": 1.5}
+    )
+
+    assert enriched_quote.volume == 1000
+    assert (enriched_quote.open, enriched_quote.high, enriched_quote.low) == (198.0, 199.0, 192.0)
+    assert enriched_quote.previous_close == 197.0

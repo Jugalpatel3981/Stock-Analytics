@@ -32,4 +32,3 @@ python -m app.scripts.init_db
 - `POST /api/v1/auth/demo`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
-- `GET /api/v1/auth/protected`

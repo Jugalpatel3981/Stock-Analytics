@@ -9,7 +9,6 @@ from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
     MessageResponse,
-    ProtectedResponse,
     UserCreate,
     UserLogin,
     UserRead,
@@ -118,11 +117,3 @@ async def logout(response: Response) -> MessageResponse:
 @router.get("/me", response_model=UserRead)
 async def read_current_user(current_user: User = Depends(get_current_user)) -> UserRead:
     return serialize_user(current_user)
-
-
-@router.get("/protected", response_model=ProtectedResponse)
-async def protected_route(current_user: User = Depends(get_current_user)) -> ProtectedResponse:
-    return ProtectedResponse(
-        message="You are authenticated",
-        user=serialize_user(current_user),
-    )

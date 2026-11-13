@@ -33,10 +33,5 @@ class AuthResponse(BaseModel):
     user: UserRead
 
 
-class ProtectedResponse(BaseModel):
-    message: str
-    user: UserRead
-
-
 class MessageResponse(BaseModel):
     message: str
