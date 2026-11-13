@@ -11,25 +11,25 @@ const siteUrl =
     : "http://localhost:3000");
 
 const description =
-  "Live stock prices, stock research, market news, watchlists and portfolio tracking in one dashboard.";
+  "Track a stock portfolio against the S&P 500 with live prices, risk analytics, stock comparison and market news.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Stock Intelligence",
-    template: "%s · Stock Intelligence",
+    default: "Stock Portfolio Analytics",
+    template: "%s · Stock Portfolio Analytics",
   },
   description,
-  applicationName: "Stock Intelligence",
+  applicationName: "Stock Portfolio Analytics",
   openGraph: {
     type: "website",
-    siteName: "Stock Intelligence",
-    title: "Stock Intelligence",
+    siteName: "Stock Portfolio Analytics",
+    title: "Stock Portfolio Analytics",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Stock Intelligence",
+    title: "Stock Portfolio Analytics",
     description,
   },
 };

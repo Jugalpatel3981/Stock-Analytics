@@ -1,6 +1,6 @@
 # Architecture
 
-Stock Intelligence Platform is a monorepo with a Next.js frontend, a FastAPI backend and a
+Stock Portfolio Analytics is a monorepo with a Next.js frontend, a FastAPI backend and a
 PostgreSQL database. The backend also keeps a short-lived cache of market data.
 
 ```mermaid

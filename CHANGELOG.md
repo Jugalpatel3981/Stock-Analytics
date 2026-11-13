@@ -4,7 +4,10 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0] - 2026-11-12
+
+The project is now **Stock Portfolio Analytics**: the AI features were removed and replaced
+with portfolio analytics and stock comparison.
 
 ### Added
 - **Analytics page:** portfolio return against the S&P 500, volatility, Sharpe ratio, beta,

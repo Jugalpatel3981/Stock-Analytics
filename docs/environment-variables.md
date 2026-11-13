@@ -19,7 +19,7 @@ FRONTEND_PORT=3000
 ## Backend Variables
 
 ```text
-APP_NAME=Stock Intelligence Platform API
+APP_NAME=Stock Portfolio Analytics API
 APP_ENV=development
 API_V1_PREFIX=/api/v1
 BACKEND_CORS_ORIGINS=http://localhost:3000

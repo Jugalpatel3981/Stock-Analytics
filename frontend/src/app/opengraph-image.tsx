@@ -1,10 +1,10 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Stock Intelligence: live prices, stock research and portfolio tracking";
+export const alt = "Stock Portfolio Analytics: live prices, portfolio analytics and stock comparison";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const features = ["Live prices", "Stock research", "Price charts", "Watchlists", "Portfolio tracking"];
+const features = ["Live prices", "Portfolio analytics", "Stock comparison", "Watchlists", "CSV import"];
 
 // Preview card shown when the site link is shared (LinkedIn, Slack, messaging apps).
 export default function OpenGraphImage() {
@@ -41,12 +41,12 @@ export default function OpenGraphImage() {
             <div style={{ width: 8, height: 32, borderRadius: 4, background: "#08111f" }} />
             <div style={{ width: 8, height: 24, borderRadius: 4, background: "#08111f" }} />
           </div>
-          <div style={{ fontSize: 34, fontWeight: 600 }}>Stock Intelligence</div>
+          <div style={{ fontSize: 34, fontWeight: 600 }}>Stock Portfolio Analytics</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.1, maxWidth: 980 }}>
-            Live prices, stock research and portfolio tracking
+            Live prices, portfolio analytics and stock comparison
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
             {features.map((feature) => (

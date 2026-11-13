@@ -10,7 +10,7 @@ export default function RegisterPage() {
   return (
     <AuthShell
       title="Create account"
-      description="Start building a secure stock intelligence workspace."
+      description="Create an account to track and analyse your portfolio."
       footer={(
         <>
           Already have an account?{" "}

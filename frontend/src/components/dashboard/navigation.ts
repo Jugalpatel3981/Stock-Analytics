@@ -20,4 +20,4 @@ export const navigationItems = [
 
 export type NavigationLabel = (typeof navigationItems)[number]["label"];
 
-export const APP_NAME = "Stock Intelligence";
+export const APP_NAME = "Stock Portfolio Analytics";

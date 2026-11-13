@@ -11,7 +11,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Sign in"
-      description="Access your portfolio intelligence dashboard."
+      description="Sign in to your portfolio dashboard."
       footer={(
         <>
           New to the platform?{" "}

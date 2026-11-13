@@ -19,7 +19,7 @@ export function AuthShell({ title, description, footer, children }: AuthShellPro
           <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <BarChart3 className="h-5 w-5" aria-hidden="true" />
           </span>
-          <span className="text-sm font-semibold">Stock Intelligence</span>
+          <span className="text-sm font-semibold">Stock Portfolio Analytics</span>
         </Link>
         <Card>
           <CardHeader>

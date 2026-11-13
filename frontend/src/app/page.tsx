@@ -54,6 +54,7 @@ const techStack = [
   "FastAPI",
   "PostgreSQL",
   "SQLAlchemy",
+  "pandas",
   "Finnhub",
   "Docker",
   "GitHub Actions",
@@ -70,7 +71,7 @@ export default async function Home() {
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <BarChart3 className="h-5 w-5" aria-hidden="true" />
             </span>
-            <span className="text-sm font-semibold">Stock Intelligence</span>
+            <span className="text-sm font-semibold">Stock Portfolio Analytics</span>
           </Link>
           <Button variant="ghost" size="sm" asChild>
             <Link href={user ? "/dashboard" : "/login"}>{user ? "Dashboard" : "Sign in"}</Link>
@@ -78,7 +79,7 @@ export default async function Home() {
         </header>
 
         <section className="py-16 text-center sm:py-24">
-          <p className="text-xs font-medium uppercase tracking-widest text-primary">Full-stack stock research platform</p>
+          <p className="text-xs font-medium uppercase tracking-widest text-primary">Full-stack portfolio analytics app</p>
           <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
             Live prices, stock research and portfolio analytics in one dashboard
           </h1>
