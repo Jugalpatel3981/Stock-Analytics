@@ -60,7 +60,7 @@ services:
       BACKEND_URL: http://backend:8000
       NEXT_PUBLIC_MARKET_STREAM_URL: ${NEXT_PUBLIC_MARKET_STREAM_URL:-ws://localhost:8000/api/v1/market/stream}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_healthy
