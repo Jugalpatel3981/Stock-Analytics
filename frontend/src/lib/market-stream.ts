@@ -34,6 +34,10 @@ type UseMarketStreamOptions = {
 };
 
 const DEFAULT_SNAPSHOT_INTERVAL_MS = 30000;
+// Wait this long before each attempt to reconnect the live stream; the last value repeats.
+const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000];
+// Only mention the outage after this many failed attempts in a row, so a brief drop goes unnoticed.
+const ATTEMPTS_BEFORE_WARNING = 3;
 const liveQuoteMemory: Record<string, LiveQuote> = {};
 
 function timestampValue(value: string | null | undefined) {
@@ -124,6 +128,10 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
 
     let socket: WebSocket | null = null;
     let isActive = true;
+    let reconnectTimer: number | undefined;
+    let failedAttempts = 0;
+    // The server refused the stream (for example, no API key), so retrying will not help.
+    let isRefused = false;
     const initialPrices = JSON.parse(initialPricesKey) as Record<string, number | null>;
     const requestedSymbols = symbolKey.split(",");
 
@@ -152,7 +160,9 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
 
     function attachHandlers(activeSocket: WebSocket) {
       activeSocket.onopen = () => {
+        failedAttempts = 0;
         setStatus("connected");
+        setError(null);
       };
 
       activeSocket.onmessage = (event) => {
@@ -165,6 +175,7 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
         };
 
         if (payload.type === "error") {
+          isRefused = true;
           setStatus("error");
           setError(payload.message ?? "Live stream unavailable");
           return;
@@ -228,14 +239,23 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
         setLastUpdated(timestamp);
       };
 
-      activeSocket.onerror = () => {
-        setStatus("error");
-        // Keep a more specific message the server already sent before closing.
-        setError((currentError) => currentError ?? "Live stream connection failed");
-      };
+      // A failed connection always ends in onclose, which decides whether to retry.
+      activeSocket.onerror = () => undefined;
 
       activeSocket.onclose = () => {
-        setStatus((currentStatus) => (currentStatus === "error" ? currentStatus : "idle"));
+        if (!isActive || isRefused) {
+          return;
+        }
+
+        // The connection dropped: try again after a growing delay. Prices keep refreshing
+        // from the 30-second snapshots in the meantime.
+        setStatus("connecting");
+        const delay = RECONNECT_DELAYS_MS[Math.min(failedAttempts, RECONNECT_DELAYS_MS.length - 1)];
+        failedAttempts += 1;
+        if (failedAttempts >= ATTEMPTS_BEFORE_WARNING) {
+          setError("Live prices are reconnecting. Prices still refresh every 30 seconds.");
+        }
+        reconnectTimer = window.setTimeout(() => void connect(), delay);
       };
     }
 
@@ -252,7 +272,13 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
         return;
       }
 
-      socket = new WebSocket(url.toString());
+      try {
+        socket = new WebSocket(url.toString());
+      } catch {
+        setStatus("error");
+        setError("Live prices are unavailable in this browser.");
+        return;
+      }
       attachHandlers(socket);
     }
 
@@ -260,6 +286,7 @@ export function useMarketStream(symbols: string[], options: UseMarketStreamOptio
 
     return () => {
       isActive = false;
+      window.clearTimeout(reconnectTimer);
       socket?.close();
     };
   }, [initialPricesKey, symbolKey]);

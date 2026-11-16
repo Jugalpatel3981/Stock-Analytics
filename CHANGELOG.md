@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-11-16
+
+### Fixed
+- Live prices stopped updating in one tab when a second tab or visitor opened the app,
+  because Finnhub's free plan allows one live connection per API key. The backend now keeps
+  a single shared Finnhub connection for every tab and reconnects to it automatically.
+- The browser now reconnects the live price stream by itself if the connection drops.
+
+### Removed
+- Quote requests to a Finnhub endpoint the free plan does not allow and to a Yahoo endpoint
+  that blocks the app, which failed on every refresh.
+- The demo-only `GET /auth/protected` route and settings that nothing read.
+
 ## [2.0.0] - 2026-11-12
 
 The project is now **Stock Portfolio Analytics**: the AI features were removed and replaced

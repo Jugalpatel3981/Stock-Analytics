@@ -1,24 +1,32 @@
-import json
+"""Streams live trades to one browser through the shared Finnhub connection."""
+
+import asyncio
+import contextlib
 from datetime import UTC, datetime
 
-import websockets
 from fastapi import WebSocket
 
 from app.core.config import get_settings
+from app.market.stream_hub import StreamClient, finnhub_stream_hub
 
 
-def timestamp_from_epoch_ms(value: int | float | None) -> str:
-    if value is None:
-        return datetime.now(UTC).isoformat()
+async def _forward_trades(client: StreamClient, websocket: WebSocket) -> None:
+    while True:
+        message = await client.queue.get()
+        await websocket.send_json(message)
 
-    return datetime.fromtimestamp(float(value) / 1000, UTC).isoformat()
+
+async def _wait_for_disconnect(websocket: WebSocket) -> None:
+    while True:
+        message = await websocket.receive()
+        if message["type"] == "websocket.disconnect":
+            return
 
 
 async def stream_finnhub_trades(websocket: WebSocket, symbols: list[str]) -> None:
-    settings = get_settings()
     await websocket.accept()
 
-    if not settings.finnhub_api_key:
+    if not get_settings().finnhub_api_key:
         await websocket.send_json(
             {
                 "type": "error",
@@ -30,35 +38,25 @@ async def stream_finnhub_trades(websocket: WebSocket, symbols: list[str]) -> Non
         await websocket.close()
         return
 
-    url = f"wss://ws.finnhub.io?token={settings.finnhub_api_key}"
-    async with websockets.connect(url, ping_interval=20, ping_timeout=20) as finnhub_socket:
-        subscribed_symbols: set[str] = set()
-        for symbol in symbols:
-            if symbol not in subscribed_symbols:
-                await finnhub_socket.send(json.dumps({"type": "subscribe", "symbol": symbol}))
-                subscribed_symbols.add(symbol)
-
+    client = await finnhub_stream_hub.register(symbols)
+    try:
         await websocket.send_json(
             {
                 "type": "connected",
-                "symbols": sorted(subscribed_symbols),
+                "symbols": sorted(client.symbols),
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 
-        async for raw_message in finnhub_socket:
-            payload = json.loads(raw_message)
-
-            if payload.get("type") != "trade":
-                continue
-
-            for trade in payload.get("data", []):
-                await websocket.send_json(
-                    {
-                        "type": "trade",
-                        "symbol": trade.get("s"),
-                        "price": trade.get("p"),
-                        "timestamp": timestamp_from_epoch_ms(trade.get("t")),
-                        "source": "Finnhub",
-                    }
-                )
+        # Stop as soon as either the browser leaves or sending to it fails.
+        tasks = {
+            asyncio.create_task(_forward_trades(client, websocket)),
+            asyncio.create_task(_wait_for_disconnect(websocket)),
+        }
+        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+    finally:
+        await finnhub_stream_hub.unregister(client)

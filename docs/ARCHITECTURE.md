@@ -70,12 +70,19 @@ Fast and slow data come from different sources so neither overwrites the other:
 
 | Data | Source | Refresh |
 | --- | --- | --- |
-| Last price, change | Finnhub WebSocket, proxied by the backend | Every trade |
+| Last price, change | Finnhub WebSocket, shared by the backend | Every trade |
 | Open, high, low, previous close | Finnhub REST | 30-second cache |
 | Volume | Yahoo Finance | 30-second cache |
 | Company profile, price history | Yahoo Finance via `yfinance` | Cached 1 to 15 minutes |
 | Stock search, company news | Finnhub REST | Cached 10 to 60 minutes |
 | Pre-market and after-hours price | Yahoo Finance, when Finnhub has no extended-hours trade | 30-second cache |
+
+Finnhub's free plan allows one WebSocket connection per API key, and opening a second one
+closes the first. `market/stream_hub.py` therefore keeps a **single** Finnhub connection for
+the whole backend. Each browser tab registers the symbols it wants; the hub subscribes to the
+union of them and passes every trade to the tabs that asked for that symbol. If Finnhub drops
+the connection, the hub reconnects with a growing delay and subscribes again, and the browser
+reconnects on its own if its connection to the backend closes.
 
 `market/market_session.py` detects US pre-market, regular, after-hours and closed sessions in
 `America/New_York` time, so the UI can label prices correctly. Outside regular hours the
